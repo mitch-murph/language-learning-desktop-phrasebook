@@ -1,5 +1,5 @@
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
-import type { Phrase } from '../../api/client';
+import type { Phrase, PhrasePatch } from '../../api/client';
 import { colorForName } from '../../domain/languages';
 import EditableText from './EditableText';
 import TagsEditor from './TagsEditor';
@@ -9,6 +9,20 @@ import AudioCell from './AudioCell';
 const columnHelper = createColumnHelper<Phrase>();
 
 export type StudyColumn = 'text' | 'transcription' | 'translation';
+
+// Kept as a single source of truth for column ids so PhraseTable's fixed
+// column widths are checked against this list at compile time.
+export const COLUMN_IDS = [
+  'languageName',
+  'translation',
+  'text',
+  'transcription',
+  'tags',
+  'audio',
+  'createdAt',
+  'actions',
+] as const;
+export type ColumnId = (typeof COLUMN_IDS)[number];
 
 function RevealButton({ onClick }: { onClick: () => void }) {
   return (
@@ -28,7 +42,7 @@ interface ColumnOptions {
   audio: HTMLAudioElement;
   onPlay: (phraseId: string, pace: 'normal' | 'slow', s3Key: string) => void;
   onTogglePause: () => void;
-  onPatch: (phraseId: string, fields: { transcription?: string; translation?: string; tags?: string[] }) => void;
+  onPatch: (phraseId: string, fields: PhrasePatch) => void;
   onDelete: (phraseId: string) => void;
   allTags: string[];
   editMode: boolean;

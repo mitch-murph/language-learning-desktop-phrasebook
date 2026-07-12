@@ -20,6 +20,12 @@ export interface Phrase {
   tags?: string[];
 }
 
+export interface PhrasePatch {
+  transcription?: string;
+  translation?: string;
+  tags?: string[];
+}
+
 export function getAudioUrl(s3Key: string): string {
   return `${AUDIO_BASE_URL}/${s3Key}`;
 }
@@ -46,10 +52,7 @@ export async function listPhrases(): Promise<Phrase[]> {
   return phrases as Phrase[];
 }
 
-export async function updatePhrase(
-  phraseId: string,
-  fields: { transcription?: string; translation?: string; tags?: string[] },
-): Promise<Phrase> {
+export async function updatePhrase(phraseId: string, fields: PhrasePatch): Promise<Phrase> {
   const res = await fetch(`${LAMBDA_URL}/phrases/${phraseId}`, {
     method: 'PUT',
     headers: await authHeaders(),

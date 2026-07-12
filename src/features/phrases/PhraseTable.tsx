@@ -8,6 +8,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import type { Phrase } from '../../api/client';
+import type { ColumnId } from './columns';
 
 interface Props {
   data: Phrase[];
@@ -15,8 +16,10 @@ interface Props {
 }
 
 // Fixed per-column widths so toggling edit mode or hiding columns never
-// changes column widths — only the cell contents change.
-const COLUMN_WIDTHS: Record<string, number> = {
+// changes column widths — only the cell contents change. Keyed by ColumnId
+// so adding/renaming a column in columns.tsx without updating this map is
+// a compile error rather than a silent fallback to the default width.
+const COLUMN_WIDTHS: Record<ColumnId, number> = {
   languageName: 150,
   translation: 220,
   text: 220,
@@ -45,7 +48,7 @@ export default function PhraseTable({ data, columns }: Props) {
       <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: 1350 }}>
         <colgroup>
           {table.getAllLeafColumns().map(col => (
-            <col key={col.id} style={{ width: COLUMN_WIDTHS[col.id] ?? 150 }} />
+            <col key={col.id} style={{ width: COLUMN_WIDTHS[col.id as ColumnId] ?? 150 }} />
           ))}
         </colgroup>
         <thead>
