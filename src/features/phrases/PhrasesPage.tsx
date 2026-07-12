@@ -12,7 +12,7 @@ const NO_HIDDEN: Record<StudyColumn, boolean> = { text: false, transcription: fa
 
 export default function PhrasesPage() {
   const { phrases, loading, error, patch, remove } = usePhrases();
-  const { audio, playingKey, currentUrl, play, togglePause } = useAudioPlayer();
+  const { playingKey, play } = useAudioPlayer();
 
   const [search, setSearch] = useState('');
   const [language, setLanguage] = useState('');
@@ -90,10 +90,7 @@ export default function PhrasesPage() {
     () =>
       buildColumns({
         playingKey,
-        currentUrl,
-        audio,
         onPlay: (phraseId, pace, s3Key) => play(`${phraseId}:${pace}`, getAudioUrl(s3Key)),
-        onTogglePause: togglePause,
         onPatch: patch,
         onDelete: remove,
         allTags: tags,
@@ -106,7 +103,7 @@ export default function PhrasesPage() {
         allVisibleSelected,
         onToggleSelectAllVisible: toggleSelectAllVisible,
       }),
-    [playingKey, currentUrl, audio, patch, remove, tags, editMode, hidden, revealed, selected, allVisibleSelected, filtered],
+    [playingKey, patch, remove, tags, editMode, hidden, revealed, selected, allVisibleSelected, filtered],
   );
 
   if (loading) return <p className="text-sm text-slate-500">Loading phrases…</p>;

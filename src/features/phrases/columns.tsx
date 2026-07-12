@@ -4,7 +4,6 @@ import { colorForName } from '../../domain/languages';
 import EditableText from './EditableText';
 import TagsEditor from './TagsEditor';
 import PlayButton from './PlayButton';
-import AudioCell from './AudioCell';
 
 const columnHelper = createColumnHelper<Phrase>();
 
@@ -39,10 +38,7 @@ function RevealButton({ onClick }: { onClick: () => void }) {
 
 interface ColumnOptions {
   playingKey: string | null;
-  currentUrl: string | null;
-  audio: HTMLAudioElement;
   onPlay: (phraseId: string, pace: 'normal' | 'slow', s3Key: string) => void;
-  onTogglePause: () => void;
   onPatch: (phraseId: string, fields: PhrasePatch) => void;
   onDelete: (phraseId: string) => void;
   allTags: string[];
@@ -71,10 +67,7 @@ function studyCell(
 
 export function buildColumns({
   playingKey,
-  currentUrl,
-  audio,
   onPlay,
-  onTogglePause,
   onPatch,
   onDelete,
   allTags,
@@ -200,28 +193,19 @@ export function buildColumns({
       header: 'Audio',
       cell: info => {
         const row = info.row.original;
-        const normalKey = `${row.phraseId}:normal`;
-        const slowKey = `${row.phraseId}:slow`;
-        const activePace = playingKey === normalKey ? 'normal' : playingKey === slowKey ? 'slow' : null;
-
-        if (!activePace) {
-          return (
-            <div className="flex items-center gap-1">
-              <PlayButton label="Normal" active={false} onClick={() => onPlay(row.phraseId, 'normal', row.normalS3Key)} />
-              <PlayButton label="Slow" active={false} onClick={() => onPlay(row.phraseId, 'slow', row.slowS3Key)} />
-            </div>
-          );
-        }
-
-        const s3Key = activePace === 'normal' ? row.normalS3Key : row.slowS3Key;
         return (
-          <AudioCell
-            audio={audio}
-            url={currentUrl ?? ''}
-            label={activePace === 'normal' ? 'Normal' : 'Slow'}
-            onTogglePause={onTogglePause}
-            onClose={() => onPlay(row.phraseId, activePace, s3Key)}
-          />
+          <div className="flex items-center gap-1">
+            <PlayButton
+              label="Normal"
+              active={playingKey === `${row.phraseId}:normal`}
+              onClick={() => onPlay(row.phraseId, 'normal', row.normalS3Key)}
+            />
+            <PlayButton
+              label="Slow"
+              active={playingKey === `${row.phraseId}:slow`}
+              onClick={() => onPlay(row.phraseId, 'slow', row.slowS3Key)}
+            />
+          </div>
         );
       },
     }),

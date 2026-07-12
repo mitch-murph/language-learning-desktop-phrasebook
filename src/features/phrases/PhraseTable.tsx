@@ -26,7 +26,7 @@ const COLUMN_WIDTHS: Record<ColumnId, number> = {
   text: 220,
   transcription: 190,
   tags: 210,
-  audio: 270,
+  audio: 170,
   createdAt: 100,
   actions: 90,
 };
@@ -46,7 +46,7 @@ export default function PhraseTable({ data, columns }: Props) {
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: 1350 }}>
+      <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: 1250 }}>
         <colgroup>
           {table.getAllLeafColumns().map(col => (
             <col key={col.id} style={{ width: COLUMN_WIDTHS[col.id as ColumnId] ?? 150 }} />
