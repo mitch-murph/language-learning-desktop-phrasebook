@@ -1,3 +1,12 @@
+import type { QueueMode } from './useQueuePlayer';
+
+const PLAY_MODES: { value: QueueMode; label: string }[] = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'slow', label: 'Slow' },
+  { value: 'drill', label: 'Drill' },
+  { value: 'recall', label: 'Recall' },
+];
+
 interface Props {
   search: string;
   onSearchChange: (v: string) => void;
@@ -11,6 +20,11 @@ interface Props {
   selectedCount: number;
   onClearSelection: () => void;
   onExport: () => void;
+  playMode: QueueMode;
+  onPlayModeChange: (m: QueueMode) => void;
+  shuffle: boolean;
+  onShuffleChange: (v: boolean) => void;
+  onPlay: () => void;
 }
 
 export default function Toolbar({
@@ -26,6 +40,11 @@ export default function Toolbar({
   selectedCount,
   onClearSelection,
   onExport,
+  playMode,
+  onPlayModeChange,
+  shuffle,
+  onShuffleChange,
+  onPlay,
 }: Props) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -67,6 +86,29 @@ export default function Toolbar({
         }`}
       >
         Clear {selectedCount} selected
+      </button>
+      <select
+        value={playMode}
+        onChange={e => onPlayModeChange(e.target.value as QueueMode)}
+        className="rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+      >
+        {PLAY_MODES.map(m => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-500">
+        <input type="checkbox" checked={shuffle} onChange={e => onShuffleChange(e.target.checked)} />
+        Shuffle
+      </label>
+      <button
+        type="button"
+        onClick={onPlay}
+        disabled={count === 0}
+        className="min-w-[150px] whitespace-nowrap rounded-md bg-emerald-600 px-3 py-1.5 text-center text-sm font-medium tabular-nums text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ▶ Play{selectedCount > 0 ? ` ${selectedCount} selected` : ` all ${count}`}
       </button>
       <button
         type="button"

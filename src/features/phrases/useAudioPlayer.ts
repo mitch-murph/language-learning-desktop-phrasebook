@@ -21,5 +21,10 @@ export function useAudioPlayer() {
     setPlayingKey(key);
   }, [audio, playingKey]);
 
-  return { playingKey, play };
+  const stop = useCallback(() => {
+    audio.pause();
+    setPlayingKey(null);
+  }, [audio]);
+
+  return { playingKey, play, stop };
 }

@@ -1,18 +1,29 @@
 import { useMemo, useState } from 'react';
-import { getAudioUrl } from '../../api/client';
+import { getAudioUrl, type Phrase } from '../../api/client';
 import { usePhrases } from './usePhrases';
 import { useAudioPlayer } from './useAudioPlayer';
+import { useQueuePlayer, type QueueMode } from './useQueuePlayer';
 import { buildColumns, type StudyColumn } from './columns';
 import PhraseTable from './PhraseTable';
 import Toolbar from './Toolbar';
 import StudyBar from './StudyBar';
 import ExportModal from './ExportModal';
+import QueuePlayerBar from './QueuePlayerBar';
 
 const NO_HIDDEN: Record<StudyColumn, boolean> = { text: false, transcription: false, translation: false };
 
+function shuffled<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export default function PhrasesPage() {
   const { phrases, loading, error, patch, remove } = usePhrases();
-  const { playingKey, play } = useAudioPlayer();
+  const { playingKey, play, stop: stopRowAudio } = useAudioPlayer();
 
   const [search, setSearch] = useState('');
   const [language, setLanguage] = useState('');
@@ -24,6 +35,11 @@ export default function PhrasesPage() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showExport, setShowExport] = useState(false);
+
+  const [playMode, setPlayMode] = useState<QueueMode>('normal');
+  const [shuffleQueue, setShuffleQueue] = useState(false);
+  const [queue, setQueue] = useState<Phrase[]>([]);
+  const queuePlayer = useQueuePlayer(queue, playMode);
 
   const languages = useMemo(
     () => [...new Set(phrases.map(p => p.languageName))].sort(),
@@ -83,14 +99,28 @@ export default function PhrasesPage() {
 
   // Manually selected phrases take priority (persists across filter changes,
   // so selections can be built up across different filter views); otherwise
-  // export operates on whatever the current search/language/tag filters show.
+  // export/play operate on whatever the current search/language/tag filters show.
   const exportTargets = selected.size > 0 ? phrases.filter(p => selected.has(p.phraseId)) : filtered;
+
+  // A row's own Normal/Slow button and the background queue share one audio
+  // stream conceptually — starting either one stops the other.
+  function onCellPlay(phraseId: string, pace: 'normal' | 'slow', s3Key: string) {
+    if (queue.length > 0) setQueue([]);
+    play(`${phraseId}:${pace}`, getAudioUrl(s3Key));
+  }
+
+  function startQueue() {
+    const list = shuffleQueue ? shuffled(exportTargets) : exportTargets;
+    if (list.length === 0) return;
+    stopRowAudio();
+    setQueue(list);
+  }
 
   const columns = useMemo(
     () =>
       buildColumns({
         playingKey,
-        onPlay: (phraseId, pace, s3Key) => play(`${phraseId}:${pace}`, getAudioUrl(s3Key)),
+        onPlay: onCellPlay,
         onPatch: patch,
         onDelete: remove,
         allTags: tags,
@@ -109,7 +139,7 @@ export default function PhrasesPage() {
   if (loading) return <p className="text-sm text-slate-500">Loading phrases…</p>;
 
   return (
-    <div>
+    <div className={queue.length > 0 ? 'pb-16' : undefined}>
       {error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
@@ -136,9 +166,28 @@ export default function PhrasesPage() {
         selectedCount={selected.size}
         onClearSelection={() => setSelected(new Set())}
         onExport={() => setShowExport(true)}
+        playMode={playMode}
+        onPlayModeChange={setPlayMode}
+        shuffle={shuffleQueue}
+        onShuffleChange={setShuffleQueue}
+        onPlay={startQueue}
       />
-      <PhraseTable data={filtered} columns={columns} />
+      <PhraseTable data={filtered} columns={columns} playingRowId={queue.length > 0 ? queuePlayer.phrase?.phraseId : null} />
       {showExport && <ExportModal phrases={exportTargets} onClose={() => setShowExport(false)} />}
+      {queue.length > 0 && (
+        <QueuePlayerBar
+          phrase={queuePlayer.phrase}
+          index={queuePlayer.index}
+          total={queuePlayer.total}
+          playing={queuePlayer.playing}
+          mode={playMode}
+          onSetMode={setPlayMode}
+          onTogglePlay={queuePlayer.togglePlay}
+          onSkipNext={queuePlayer.skipNext}
+          onSkipPrev={queuePlayer.skipPrev}
+          onStop={() => setQueue([])}
+        />
+      )}
     </div>
   );
 }

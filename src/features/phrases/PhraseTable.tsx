@@ -13,6 +13,7 @@ import type { ColumnId } from './columns';
 interface Props {
   data: Phrase[];
   columns: ColumnDef<Phrase, any>[];
+  playingRowId?: string | null;
 }
 
 // Proportional per-column widths (sum to 100%) so toggling edit mode or
@@ -36,7 +37,7 @@ const COLUMN_WIDTHS: Record<ColumnId, string> = {
 };
 const TABLE_MIN_WIDTH = 900;
 
-export default function PhraseTable({ data, columns }: Props) {
+export default function PhraseTable({ data, columns, playingRowId }: Props) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const table = useReactTable({
@@ -88,20 +89,28 @@ export default function PhraseTable({ data, columns }: Props) {
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map(row => (
-            <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
-              {row.getVisibleCells().map(cell => (
-                <td
-                  key={cell.id}
-                  className={`h-12 px-3 py-1.5 align-middle ${
-                    cell.column.id === 'tags' ? '' : 'overflow-hidden'
-                  }`}
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {table.getRowModel().rows.map(row => {
+            const isPlaying = row.original.phraseId === playingRowId;
+            return (
+              <tr
+                key={row.id}
+                className={`border-b border-slate-100 last:border-0 ${
+                  isPlaying ? 'bg-blue-50 hover:bg-blue-50' : 'hover:bg-slate-50/60'
+                }`}
+              >
+                {row.getVisibleCells().map(cell => (
+                  <td
+                    key={cell.id}
+                    className={`h-12 px-3 py-1.5 align-middle ${
+                      cell.column.id === 'tags' ? '' : 'overflow-hidden'
+                    }`}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
           {table.getRowModel().rows.length === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-3 py-8 text-center text-sm text-slate-400">
