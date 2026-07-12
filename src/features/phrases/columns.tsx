@@ -4,18 +4,11 @@ import { colorForName } from '../../domain/languages';
 import EditableText from './EditableText';
 import TagsEditor from './TagsEditor';
 import PlayButton from './PlayButton';
-import Waveform from './Waveform';
+import AudioCell from './AudioCell';
 
 const columnHelper = createColumnHelper<Phrase>();
 
 export type StudyColumn = 'text' | 'transcription' | 'translation';
-
-function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 function RevealButton({ onClick }: { onClick: () => void }) {
   return (
@@ -32,11 +25,8 @@ function RevealButton({ onClick }: { onClick: () => void }) {
 interface ColumnOptions {
   playingKey: string | null;
   currentUrl: string | null;
-  currentTime: number;
-  duration: number;
-  isPlaying: boolean;
+  audio: HTMLAudioElement;
   onPlay: (phraseId: string, pace: 'normal' | 'slow', s3Key: string) => void;
-  onSeek: (fraction: number) => void;
   onTogglePause: () => void;
   onPatch: (phraseId: string, fields: { transcription?: string; translation?: string; tags?: string[] }) => void;
   onDelete: (phraseId: string) => void;
@@ -63,11 +53,8 @@ function studyCell(
 export function buildColumns({
   playingKey,
   currentUrl,
-  currentTime,
-  duration,
-  isPlaying,
+  audio,
   onPlay,
-  onSeek,
   onTogglePause,
   onPatch,
   onDelete,
@@ -186,21 +173,13 @@ export function buildColumns({
 
         const s3Key = activePace === 'normal' ? row.normalS3Key : row.slowS3Key;
         return (
-          <div className="flex items-center gap-1.5">
-            <PlayButton label={activePace === 'normal' ? 'Normal' : 'Slow'} active={isPlaying} onClick={onTogglePause} />
-            <Waveform url={currentUrl ?? ''} progress={duration > 0 ? currentTime / duration : 0} onSeek={onSeek} />
-            <span className="shrink-0 whitespace-nowrap text-[10px] tabular-nums text-slate-400">
-              {formatTime(currentTime)}/{formatTime(duration)}
-            </span>
-            <button
-              type="button"
-              onClick={() => onPlay(row.phraseId, activePace, s3Key)}
-              aria-label="Close player"
-              className="shrink-0 rounded px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            >
-              ✕
-            </button>
-          </div>
+          <AudioCell
+            audio={audio}
+            url={currentUrl ?? ''}
+            label={activePace === 'normal' ? 'Normal' : 'Slow'}
+            onTogglePause={onTogglePause}
+            onClose={() => onPlay(row.phraseId, activePace, s3Key)}
+          />
         );
       },
     }),
