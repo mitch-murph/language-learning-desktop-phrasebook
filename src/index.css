@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+html {
+  /* Reserve the vertical scrollbar's space permanently so its appearance/
+     disappearance (as the phrase table grows or shrinks with filters) never
+     shifts the page's horizontal layout. */
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }

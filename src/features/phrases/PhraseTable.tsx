@@ -15,21 +15,26 @@ interface Props {
   columns: ColumnDef<Phrase, any>[];
 }
 
-// Fixed per-column widths so toggling edit mode or hiding columns never
-// changes column widths — only the cell contents change. Keyed by ColumnId
-// so adding/renaming a column in columns.tsx without updating this map is
-// a compile error rather than a silent fallback to the default width.
-const COLUMN_WIDTHS: Record<ColumnId, number> = {
-  select: 36,
-  languageName: 150,
-  translation: 220,
-  text: 220,
-  transcription: 190,
-  tags: 210,
-  audio: 170,
-  createdAt: 100,
-  actions: 90,
+// Proportional per-column widths (sum to 100%) so toggling edit mode or
+// hiding columns never changes column widths — only the cell contents
+// change — and the table fills its container exactly instead of forcing
+// horizontal scroll at every width. Keyed by ColumnId so adding/renaming a
+// column in columns.tsx without updating this map is a compile error rather
+// than a silent fallback to the default width. TABLE_MIN_WIDTH is a floor
+// below which columns would be squeezed unreadably thin; narrower windows
+// scroll horizontally instead.
+const COLUMN_WIDTHS: Record<ColumnId, string> = {
+  select: '3%',
+  languageName: '11%',
+  translation: '16%',
+  text: '16%',
+  transcription: '14%',
+  tags: '15%',
+  audio: '12%',
+  createdAt: '7%',
+  actions: '6%',
 };
+const TABLE_MIN_WIDTH = 900;
 
 export default function PhraseTable({ data, columns }: Props) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -46,10 +51,10 @@ export default function PhraseTable({ data, columns }: Props) {
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: 1250 }}>
+      <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: TABLE_MIN_WIDTH }}>
         <colgroup>
           {table.getAllLeafColumns().map(col => (
-            <col key={col.id} style={{ width: COLUMN_WIDTHS[col.id as ColumnId] ?? 150 }} />
+            <col key={col.id} style={{ width: COLUMN_WIDTHS[col.id as ColumnId] ?? '10%' }} />
           ))}
         </colgroup>
         <thead>
@@ -60,16 +65,22 @@ export default function PhraseTable({ data, columns }: Props) {
                   key={header.id}
                   className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500"
                 >
-                  {header.isPlaceholder ? null : (
+                  {header.isPlaceholder ? null : header.column.getCanSort() ? (
                     <button
                       type="button"
-                      disabled={!header.column.getCanSort()}
                       onClick={header.column.getToggleSortingHandler()}
-                      className="flex items-center gap-1 disabled:cursor-default"
+                      className="flex items-center gap-1"
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {{ asc: '▲', desc: '▼' }[header.column.getIsSorted() as string] ?? ''}
                     </button>
+                  ) : (
+                    // Non-sortable columns (e.g. the select checkbox) render without a
+                    // wrapping button — a checkbox nested inside a button is invalid
+                    // HTML and silently swallows its own click/change events.
+                    <div className="flex items-center gap-1">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </div>
                   )}
                 </th>
               ))}

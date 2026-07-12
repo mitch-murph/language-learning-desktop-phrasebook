@@ -83,6 +83,7 @@ export function buildColumns({
   return [
     columnHelper.display({
       id: 'select',
+      enableSorting: false,
       header: () => (
         <input
           type="checkbox"
@@ -104,11 +105,15 @@ export function buildColumns({
       header: 'Language',
       cell: info => (
         <span
-          className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium"
+          className="flex items-center gap-1.5 truncate text-sm font-medium"
           style={{ color: colorForName(info.getValue()) }}
+          title={info.getValue()}
         >
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorForName(info.getValue()) }} />
-          {info.getValue()}
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: colorForName(info.getValue()) }}
+          />
+          <span className="truncate">{info.getValue()}</span>
         </span>
       ),
     }),
@@ -190,6 +195,7 @@ export function buildColumns({
     }),
     columnHelper.display({
       id: 'audio',
+      enableSorting: false,
       header: 'Audio',
       cell: info => {
         const row = info.row.original;
@@ -219,6 +225,7 @@ export function buildColumns({
     }),
     columnHelper.display({
       id: 'actions',
+      enableSorting: false,
       header: '',
       cell: info => {
         if (!editMode) return null;

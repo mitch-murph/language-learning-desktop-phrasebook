@@ -72,11 +72,11 @@ export default function Toolbar({
         type="button"
         onClick={onExport}
         disabled={count === 0}
-        className="whitespace-nowrap rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+        className="min-w-[170px] whitespace-nowrap rounded-md bg-slate-800 px-3 py-1.5 text-center text-sm font-medium tabular-nums text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Export{selectedCount > 0 ? ` ${selectedCount} selected` : ` all ${count}`}
       </button>
-      <span className="ml-auto whitespace-nowrap text-sm text-slate-500">
+      <span className="ml-auto min-w-[90px] whitespace-nowrap text-right text-sm tabular-nums text-slate-500">
         {count} phrase{count === 1 ? '' : 's'}
       </span>
     </div>
