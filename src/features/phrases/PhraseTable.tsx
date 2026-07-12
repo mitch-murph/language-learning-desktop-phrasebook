@@ -20,6 +20,7 @@ interface Props {
 // so adding/renaming a column in columns.tsx without updating this map is
 // a compile error rather than a silent fallback to the default width.
 const COLUMN_WIDTHS: Record<ColumnId, number> = {
+  select: 36,
   languageName: 150,
   translation: 220,
   text: 220,

@@ -8,6 +8,9 @@ interface Props {
   onTagChange: (v: string) => void;
   tags: string[];
   count: number;
+  selectedCount: number;
+  onClearSelection: () => void;
+  onExport: () => void;
 }
 
 export default function Toolbar({
@@ -20,6 +23,9 @@ export default function Toolbar({
   onTagChange,
   tags,
   count,
+  selectedCount,
+  onClearSelection,
+  onExport,
 }: Props) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -53,6 +59,23 @@ export default function Toolbar({
           </option>
         ))}
       </select>
+      {selectedCount > 0 && (
+        <button
+          type="button"
+          onClick={onClearSelection}
+          className="whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
+        >
+          Clear {selectedCount} selected
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onExport}
+        disabled={count === 0}
+        className="whitespace-nowrap rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Export{selectedCount > 0 ? ` ${selectedCount} selected` : ` all ${count}`}
+      </button>
       <span className="ml-auto whitespace-nowrap text-sm text-slate-500">
         {count} phrase{count === 1 ? '' : 's'}
       </span>

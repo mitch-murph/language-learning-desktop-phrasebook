@@ -13,6 +13,7 @@ export type StudyColumn = 'text' | 'transcription' | 'translation';
 // Kept as a single source of truth for column ids so PhraseTable's fixed
 // column widths are checked against this list at compile time.
 export const COLUMN_IDS = [
+  'select',
   'languageName',
   'translation',
   'text',
@@ -49,6 +50,10 @@ interface ColumnOptions {
   hidden: Record<StudyColumn, boolean>;
   isRevealed: (phraseId: string, column: StudyColumn) => boolean;
   onReveal: (phraseId: string, column: StudyColumn) => void;
+  selected: Set<string>;
+  onToggleSelect: (phraseId: string) => void;
+  allVisibleSelected: boolean;
+  onToggleSelectAllVisible: () => void;
 }
 
 function studyCell(
@@ -77,8 +82,31 @@ export function buildColumns({
   hidden,
   isRevealed,
   onReveal,
+  selected,
+  onToggleSelect,
+  allVisibleSelected,
+  onToggleSelectAllVisible,
 }: ColumnOptions): ColumnDef<Phrase, any>[] {
   return [
+    columnHelper.display({
+      id: 'select',
+      header: () => (
+        <input
+          type="checkbox"
+          checked={allVisibleSelected}
+          onChange={onToggleSelectAllVisible}
+          aria-label="Select all visible phrases"
+        />
+      ),
+      cell: info => (
+        <input
+          type="checkbox"
+          checked={selected.has(info.row.original.phraseId)}
+          onChange={() => onToggleSelect(info.row.original.phraseId)}
+          aria-label={`Select ${info.row.original.text}`}
+        />
+      ),
+    }),
     columnHelper.accessor('languageName', {
       header: 'Language',
       cell: info => (

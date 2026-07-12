@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@tanstack/react-table": "^8",
+    "jszip": "^3.10.1",
     "react": "^18",
     "react-dom": "^18"
   },
