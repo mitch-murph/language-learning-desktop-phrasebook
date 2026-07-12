@@ -47,15 +47,15 @@ export default function StudyBar({ editMode, onToggleEditMode, hidden, onToggleH
         ))}
       </div>
 
-      {anyHidden && (
-        <button
-          type="button"
-          onClick={onResetReveals}
-          className="ml-auto rounded-md px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
-        >
-          Hide revealed cells again
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onResetReveals}
+        className={`ml-auto rounded-md px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 ${
+          anyHidden ? '' : 'invisible pointer-events-none'
+        }`}
+      >
+        Hide revealed cells again
+      </button>
     </div>
   );
 }
