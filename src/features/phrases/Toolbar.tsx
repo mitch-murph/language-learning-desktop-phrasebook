@@ -59,15 +59,15 @@ export default function Toolbar({
           </option>
         ))}
       </select>
-      {selectedCount > 0 && (
-        <button
-          type="button"
-          onClick={onClearSelection}
-          className="whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
-        >
-          Clear {selectedCount} selected
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onClearSelection}
+        className={`whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 ${
+          selectedCount > 0 ? '' : 'invisible pointer-events-none'
+        }`}
+      >
+        Clear {selectedCount} selected
+      </button>
       <button
         type="button"
         onClick={onExport}
