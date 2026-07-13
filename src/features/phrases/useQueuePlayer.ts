@@ -242,7 +242,17 @@ export function useQueuePlayer(queue: Phrase[], mode: QueueMode): QueuePlayerApi
     // Listening to the element directly keeps `playing` truthful regardless
     // of how the pause happened.
     const onNativePlay = () => setPlaying(true);
-    const onNativePause = () => setPlaying(false);
+    // Every browser fires 'pause' immediately before 'ended' when a
+    // non-looping clip finishes naturally (a.ended is already true by the
+    // time this listener runs) — that's the engine advancing to the next
+    // segment, not a real user/OS pause. Treating it as one froze the queue
+    // after the first phrase: `playing` flipped false, the pause/resume
+    // effect called a.pause() on the segment we'd just started, and the gap
+    // timer (gated on `playing`) never scheduled again.
+    const onNativePause = () => {
+      if (a.ended) return;
+      setPlaying(false);
+    };
     a.addEventListener('ended', onEnded);
     a.addEventListener('error', onError);
     a.addEventListener('play', onNativePlay);
