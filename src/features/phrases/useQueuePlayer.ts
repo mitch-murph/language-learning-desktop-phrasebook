@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getAudioUrl, type Phrase } from '../../api/client';
 
-export type QueueMode = 'normal' | 'slow' | 'drill' | 'recall';
+export type QueueMode = 'normal' | 'slow' | 'drill' | 'recall' | 'recallDrill';
 
 interface Segment {
   kind: 'audio' | 'gap';
@@ -41,6 +41,18 @@ const SEQUENCES: Record<QueueMode, Segment[]> = {
     { kind: 'gap', scale: 2.5, minMs: 4000, maxMs: 12000 },
     { kind: 'audio', src: 'normal' },
     { kind: 'gap', scale: 1.5, minMs: 2000 },
+  ],
+  // Recall's translation lead-in (gap doubled, to give more time to recall
+  // before the drill reveal), then a full drill rep.
+  recallDrill: [
+    { kind: 'audio', src: 'translation' },
+    { kind: 'gap', scale: 5, minMs: 8000, maxMs: 24000 },
+    { kind: 'audio', src: 'normal' },
+    { kind: 'gap', scale: 0.6, minMs: 700 },
+    { kind: 'audio', src: 'slow' },
+    { kind: 'gap', scale: 0.6, minMs: 700 },
+    { kind: 'audio', src: 'normal' },
+    { kind: 'gap', scale: 1.2, minMs: 1500 },
   ],
 };
 

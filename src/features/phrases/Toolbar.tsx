@@ -6,6 +6,7 @@ const PLAY_MODES: { value: QueueMode; label: string }[] = [
   { value: 'slow', label: 'Slow' },
   { value: 'drill', label: 'Drill' },
   { value: 'recall', label: 'Recall' },
+  { value: 'recallDrill', label: 'Recall Drill' },
 ];
 
 interface Props {

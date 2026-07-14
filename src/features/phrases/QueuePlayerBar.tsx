@@ -6,6 +6,7 @@ const MODE_LABEL: Record<QueueMode, string> = {
   slow: 'Slow',
   drill: 'Drill',
   recall: 'Recall',
+  recallDrill: 'Recall Drill',
 };
 
 interface Props {
