@@ -1,3 +1,4 @@
+import MultiSelectDropdown from './MultiSelectDropdown';
 import type { QueueMode } from './useQueuePlayer';
 
 const PLAY_MODES: { value: QueueMode; label: string }[] = [
@@ -10,12 +11,12 @@ const PLAY_MODES: { value: QueueMode; label: string }[] = [
 interface Props {
   search: string;
   onSearchChange: (v: string) => void;
-  language: string;
-  onLanguageChange: (v: string) => void;
-  languages: string[];
-  tag: string;
-  onTagChange: (v: string) => void;
-  tags: string[];
+  selectedLanguages: string[];
+  onLanguagesChange: (v: string[]) => void;
+  languageOptions: string[];
+  selectedTags: string[];
+  onTagsChange: (v: string[]) => void;
+  tagOptions: string[];
   count: number;
   selectedCount: number;
   onClearSelection: () => void;
@@ -30,12 +31,12 @@ interface Props {
 export default function Toolbar({
   search,
   onSearchChange,
-  language,
-  onLanguageChange,
-  languages,
-  tag,
-  onTagChange,
-  tags,
+  selectedLanguages,
+  onLanguagesChange,
+  languageOptions,
+  selectedTags,
+  onTagsChange,
+  tagOptions,
   count,
   selectedCount,
   onClearSelection,
@@ -54,30 +55,18 @@ export default function Toolbar({
         placeholder="Search phrase, romanization, translation…"
         className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
       />
-      <select
-        value={language}
-        onChange={e => onLanguageChange(e.target.value)}
-        className="rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-      >
-        <option value="">All languages</option>
-        {languages.map(l => (
-          <option key={l} value={l}>
-            {l}
-          </option>
-        ))}
-      </select>
-      <select
-        value={tag}
-        onChange={e => onTagChange(e.target.value)}
-        className="rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-      >
-        <option value="">All tags</option>
-        {tags.map(t => (
-          <option key={t} value={t}>
-            {t}
-          </option>
-        ))}
-      </select>
+      <MultiSelectDropdown
+        label="languages"
+        options={languageOptions}
+        selected={selectedLanguages}
+        onChange={onLanguagesChange}
+      />
+      <MultiSelectDropdown
+        label="tags"
+        options={tagOptions}
+        selected={selectedTags}
+        onChange={onTagsChange}
+      />
       <button
         type="button"
         onClick={onClearSelection}

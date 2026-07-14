@@ -26,8 +26,8 @@ export default function PhrasesPage() {
   const { playingKey, play, stop: stopRowAudio } = useAudioPlayer();
 
   const [search, setSearch] = useState('');
-  const [language, setLanguage] = useState('');
-  const [tag, setTag] = useState('');
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const [editMode, setEditMode] = useState(false);
   const [hidden, setHidden] = useState<Record<StudyColumn, boolean>>(NO_HIDDEN);
@@ -53,15 +53,15 @@ export default function PhrasesPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return phrases.filter(p => {
-      if (language && p.languageName !== language) return false;
-      if (tag && !(p.tags ?? []).includes(tag)) return false;
+      if (selectedLanguages.length > 0 && !selectedLanguages.includes(p.languageName)) return false;
+      if (selectedTags.length > 0 && !(p.tags ?? []).some(t => selectedTags.includes(t))) return false;
       if (q) {
         const haystack = `${p.text} ${p.transcription ?? ''} ${p.translation ?? ''}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [phrases, search, language, tag]);
+  }, [phrases, search, selectedLanguages, selectedTags]);
 
   function toggleHidden(col: StudyColumn) {
     setHidden(h => ({ ...h, [col]: !h[col] }));
@@ -156,12 +156,12 @@ export default function PhrasesPage() {
       <Toolbar
         search={search}
         onSearchChange={setSearch}
-        language={language}
-        onLanguageChange={setLanguage}
-        languages={languages}
-        tag={tag}
-        onTagChange={setTag}
-        tags={tags}
+        selectedLanguages={selectedLanguages}
+        onLanguagesChange={setSelectedLanguages}
+        languageOptions={languages}
+        selectedTags={selectedTags}
+        onTagsChange={setSelectedTags}
+        tagOptions={tags}
         count={filtered.length}
         selectedCount={selected.size}
         onClearSelection={() => setSelected(new Set())}
