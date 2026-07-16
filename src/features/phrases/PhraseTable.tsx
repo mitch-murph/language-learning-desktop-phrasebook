@@ -26,13 +26,14 @@ interface Props {
 // scroll horizontally instead.
 const COLUMN_WIDTHS: Record<ColumnId, string> = {
   select: '3%',
-  languageName: '11%',
-  translation: '16%',
-  text: '16%',
-  transcription: '14%',
-  tags: '15%',
-  audio: '12%',
+  languageName: '10%',
+  translation: '15%',
+  text: '15%',
+  transcription: '13%',
+  tags: '14%',
+  audio: '11%',
   createdAt: '7%',
+  hide: '6%',
   actions: '6%',
 };
 const TABLE_MIN_WIDTH = 900;
@@ -64,7 +65,7 @@ export default function PhraseTable({ data, columns, playingRowId }: Props) {
               {headerGroup.headers.map(header => (
                 <th
                   key={header.id}
-                  className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                  className="px-3 py-2 text-xs font-semibold tracking-wide text-slate-500"
                 >
                   {header.isPlaceholder ? null : header.column.getCanSort() ? (
                     <button

@@ -18,6 +18,8 @@ interface Props {
   selectedTags: string[];
   onTagsChange: (v: string[]) => void;
   tagOptions: string[];
+  showHidden: boolean;
+  onShowHiddenChange: (v: boolean) => void;
   count: number;
   selectedCount: number;
   onClearSelection: () => void;
@@ -38,6 +40,8 @@ export default function Toolbar({
   selectedTags,
   onTagsChange,
   tagOptions,
+  showHidden,
+  onShowHiddenChange,
   count,
   selectedCount,
   onClearSelection,
@@ -68,6 +72,10 @@ export default function Toolbar({
         selected={selectedTags}
         onChange={onTagsChange}
       />
+      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-500">
+        <input type="checkbox" checked={showHidden} onChange={e => onShowHiddenChange(e.target.checked)} />
+        Show hidden
+      </label>
       <button
         type="button"
         onClick={onClearSelection}

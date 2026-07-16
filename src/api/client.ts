@@ -18,12 +18,14 @@ export interface Phrase {
   translation?: string;
   translationS3Key?: string;
   tags?: string[];
+  hide?: boolean;
 }
 
 export interface PhrasePatch {
   transcription?: string;
   translation?: string;
   tags?: string[];
+  hide?: boolean;
 }
 
 export function getAudioUrl(s3Key: string): string {

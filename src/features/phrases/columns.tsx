@@ -20,6 +20,7 @@ export const COLUMN_IDS = [
   'tags',
   'audio',
   'createdAt',
+  'hide',
   'actions',
 ] as const;
 export type ColumnId = (typeof COLUMN_IDS)[number];
@@ -222,6 +223,32 @@ export function buildColumns({
           {new Date(info.getValue()).toLocaleDateString()}
         </span>
       ),
+    }),
+    columnHelper.accessor('hide', {
+      id: 'hide',
+      header: 'Visibility',
+      enableSorting: false,
+      cell: info => {
+        const row = info.row.original;
+        const isHidden = info.getValue() ?? false;
+        if (!editMode) {
+          return isHidden ? (
+            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">Hidden</span>
+          ) : (
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">
+              Visible
+            </span>
+          );
+        }
+        return (
+          <input
+            type="checkbox"
+            checked={isHidden}
+            onChange={() => onPatch(row.phraseId, { hide: !isHidden })}
+            aria-label={`Hide ${row.text}`}
+          />
+        );
+      },
     }),
     columnHelper.display({
       id: 'actions',

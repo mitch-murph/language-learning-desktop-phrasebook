@@ -28,6 +28,7 @@ export default function PhrasesPage() {
   const [search, setSearch] = useState('');
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showHidden, setShowHidden] = useState(true);
 
   const [editMode, setEditMode] = useState(false);
   const [hidden, setHidden] = useState<Record<StudyColumn, boolean>>(NO_HIDDEN);
@@ -53,6 +54,7 @@ export default function PhrasesPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return phrases.filter(p => {
+      if (!showHidden && (p.hide ?? false)) return false;
       if (selectedLanguages.length > 0 && !selectedLanguages.includes(p.languageName)) return false;
       if (selectedTags.length > 0 && !(p.tags ?? []).some(t => selectedTags.includes(t))) return false;
       if (q) {
@@ -61,7 +63,7 @@ export default function PhrasesPage() {
       }
       return true;
     });
-  }, [phrases, search, selectedLanguages, selectedTags]);
+  }, [phrases, search, selectedLanguages, selectedTags, showHidden]);
 
   function toggleHidden(col: StudyColumn) {
     setHidden(h => ({ ...h, [col]: !h[col] }));
@@ -162,6 +164,8 @@ export default function PhrasesPage() {
         selectedTags={selectedTags}
         onTagsChange={setSelectedTags}
         tagOptions={tags}
+        showHidden={showHidden}
+        onShowHiddenChange={setShowHidden}
         count={filtered.length}
         selectedCount={selected.size}
         onClearSelection={() => setSelected(new Set())}
