@@ -108,6 +108,8 @@ export interface QueuePlayerApi {
   index: number;
   total: number;
   playing: boolean;
+  volume: number;
+  setVolume: (v: number) => void;
   skipNext: () => void;
   skipPrev: () => void;
   togglePlay: () => void;
@@ -121,6 +123,9 @@ export interface QueuePlayerApi {
 export function useQueuePlayer(queue: Phrase[], mode: QueueMode): QueuePlayerApi {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
+  const [volume, setVolume] = useState(1);
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
 
   const S = useRef({ index, playing, mode });
   S.current = { index, playing, mode };
@@ -150,6 +155,7 @@ export function useQueuePlayer(queue: Phrase[], mode: QueueMode): QueuePlayerApi
     if (!audioRef.current) {
       const a = new Audio();
       a.preload = 'auto';
+      a.volume = volumeRef.current;
       audioRef.current = a;
     }
     return audioRef.current;
@@ -323,6 +329,12 @@ export function useQueuePlayer(queue: Phrase[], mode: QueueMode): QueuePlayerApi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing]);
 
+  // Apply volume changes live to whichever clip (or silent gap loop) is
+  // currently loaded, without interrupting playback.
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
+
   // Release the generated silent-loop blob URL when the engine unmounts.
   useEffect(() => {
     return () => {
@@ -398,6 +410,8 @@ export function useQueuePlayer(queue: Phrase[], mode: QueueMode): QueuePlayerApi
     index,
     total: queue.length,
     playing,
+    volume,
+    setVolume,
     skipNext: () => advanceRef.current(1),
     skipPrev: () => advanceRef.current(-1),
     togglePlay: () => setPlaying(p => !p),

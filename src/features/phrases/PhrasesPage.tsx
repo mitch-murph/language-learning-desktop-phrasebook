@@ -185,11 +185,13 @@ export default function PhrasesPage() {
           total={queuePlayer.total}
           playing={queuePlayer.playing}
           mode={playMode}
+          volume={queuePlayer.volume}
           onSetMode={setPlayMode}
           onTogglePlay={queuePlayer.togglePlay}
           onSkipNext={queuePlayer.skipNext}
           onSkipPrev={queuePlayer.skipPrev}
           onStop={() => setQueue([])}
+          onVolumeChange={queuePlayer.setVolume}
         />
       )}
     </div>
