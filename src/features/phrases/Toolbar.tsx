@@ -4,9 +4,12 @@ import type { QueueMode } from './useQueuePlayer';
 const PLAY_MODES: { value: QueueMode; label: string }[] = [
   { value: 'normal', label: 'Normal' },
   { value: 'slow', label: 'Slow' },
+  { value: 'fast', label: 'Fast' },
   { value: 'drill', label: 'Drill' },
+  { value: 'fastDrill', label: 'Fast Drill' },
   { value: 'recall', label: 'Recall' },
   { value: 'recallDrill', label: 'Recall Drill' },
+  { value: 'reverseRecall', label: 'Reverse Recall' },
 ];
 
 interface Props {

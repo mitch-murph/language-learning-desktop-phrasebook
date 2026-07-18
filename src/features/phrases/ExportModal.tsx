@@ -5,11 +5,29 @@ import { downloadCombined, downloadZip, type ExportMode, type ExportResult, type
 const MODE_INFO: Record<ExportMode, { label: string; description: string }> = {
   normal: { label: 'Normal', description: 'One file per phrase at normal speed.' },
   slow: { label: 'Slow', description: 'One file per phrase at slow "teacher" speed.' },
+  fast: {
+    label: 'Fast',
+    description: 'Same audio as Normal — only affects Combined export, which uses a much shorter gap between phrases.',
+  },
   drill: { label: 'Drill', description: 'Normal, then slow, then normal again per phrase, with pauses between.' },
+  fastDrill: {
+    label: 'Fast Drill',
+    description: 'Normal, then slow, then normal again, with much shorter pauses than Drill.',
+  },
   recall: {
     label: 'Recall',
     description:
       'Translation first, a pause to try to recall it, then the phrase as the reveal. Phrases with no saved translation audio are skipped.',
+  },
+  recallDrill: {
+    label: 'Recall Drill',
+    description:
+      'Translation lead-in with a long pause, then a full Drill rep (normal, slow, normal). Phrases with no saved translation audio are skipped.',
+  },
+  reverseRecall: {
+    label: 'Reverse Recall',
+    description:
+      'The mirror of Recall — normal speed first, a pause, then the translation as the reveal. Phrases with no saved translation audio are skipped.',
   },
 };
 
@@ -44,7 +62,7 @@ export default function ExportModal({ phrases, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
         <h2 className="mb-3 text-base font-semibold text-slate-800">
           Export {phrases.length} phrase{phrases.length !== 1 ? 's' : ''}
         </h2>
@@ -72,7 +90,8 @@ export default function ExportModal({ phrases, onClose }: Props) {
         </div>
         <p className="mb-1 text-xs text-slate-500">{MODE_INFO[mode].description}</p>
         <p className="mb-4 text-xs text-slate-400">
-          Combined joins every phrase into one MP3 with a 3s gap between phrases; ZIP gives one MP3 file per phrase.
+          Combined joins every phrase into one MP3 with a gap between phrases (shorter for Fast/Fast Drill); ZIP gives
+          one MP3 file per phrase.
         </p>
 
         <div className="flex gap-2">

@@ -1,17 +1,34 @@
 import JSZip from 'jszip';
 import { getAudioUrl, type Phrase } from '../../api/client';
 
-export type ExportMode = 'normal' | 'slow' | 'drill' | 'recall';
+export type ExportMode = 'normal' | 'slow' | 'fast' | 'drill' | 'fastDrill' | 'recall' | 'recallDrill' | 'reverseRecall';
 export type ExportStage = 'fetch' | 'encode';
 export type ExportProgressCallback = (done: number, total: number, stage: ExportStage) => void;
 
 const DRILL_STEP_GAP_SEC = 2;
+const FAST_STEP_GAP_SEC = 0.3;
 const RECALL_MIN_GAP_SEC = 4;
 const RECALL_MAX_GAP_SEC = 12;
 const RECALL_GAP_MULTIPLIER = 2.5;
+const RECALL_DRILL_MIN_GAP_SEC = 8;
+const RECALL_DRILL_MAX_GAP_SEC = 24;
+const RECALL_DRILL_GAP_MULTIPLIER = 5;
 const PHRASE_GAP_SEC = 3;
 const MP3_BITRATE = 128;
 const MP3_BLOCK_SIZE = 1152; // samples per LAME frame
+
+// Modes whose combined-export gap between phrases should mirror their much
+// shorter live-playback pause, instead of the standard PHRASE_GAP_SEC.
+const COMBINED_PHRASE_GAP_SEC: Record<ExportMode, number> = {
+  normal: PHRASE_GAP_SEC,
+  slow: PHRASE_GAP_SEC,
+  fast: FAST_STEP_GAP_SEC,
+  drill: PHRASE_GAP_SEC,
+  fastDrill: FAST_STEP_GAP_SEC,
+  recall: PHRASE_GAP_SEC,
+  recallDrill: PHRASE_GAP_SEC,
+  reverseRecall: PHRASE_GAP_SEC,
+};
 
 function sanitizeFilename(s: string): string {
   return (
@@ -92,6 +109,17 @@ function renderSequence(segments: { buffer: AudioBuffer; gapAfterSec: number }[]
   return offline.startRendering();
 }
 
+function scaledGapSec(durationSec: number, multiplier: number, minSec: number, maxSec: number): number {
+  return Math.min(maxSec, Math.max(minSec, durationSec * multiplier));
+}
+
+function requireTranslation(phrase: Phrase, modeLabel: string): string {
+  if (!phrase.translationS3Key) {
+    throw new Error(`No translation audio saved for this phrase — ${modeLabel} mode needs one.`);
+  }
+  return phrase.translationS3Key;
+}
+
 // normal → gap → slow → gap → normal
 async function renderDrill(ctx: AudioContext, phrase: Phrase): Promise<AudioBuffer> {
   const normalBuf = await decodeAudio(ctx, getAudioUrl(phrase.normalS3Key));
@@ -103,30 +131,72 @@ async function renderDrill(ctx: AudioContext, phrase: Phrase): Promise<AudioBuff
   ]);
 }
 
+// The drill sequence with fast-style compressed gaps throughout.
+async function renderFastDrill(ctx: AudioContext, phrase: Phrase): Promise<AudioBuffer> {
+  const normalBuf = await decodeAudio(ctx, getAudioUrl(phrase.normalS3Key));
+  const slowBuf = await decodeAudio(ctx, getAudioUrl(phrase.slowS3Key));
+  return renderSequence([
+    { buffer: normalBuf, gapAfterSec: FAST_STEP_GAP_SEC },
+    { buffer: slowBuf, gapAfterSec: FAST_STEP_GAP_SEC },
+    { buffer: normalBuf, gapAfterSec: 0 },
+  ]);
+}
+
 // translation → gap (scaled to give recall time) → normal (the reveal)
 async function renderRecall(ctx: AudioContext, phrase: Phrase): Promise<AudioBuffer> {
-  if (!phrase.translationS3Key) {
-    throw new Error('No translation audio saved for this phrase — recall mode needs one.');
-  }
-  const translationBuf = await decodeAudio(ctx, getAudioUrl(phrase.translationS3Key));
+  const translationKey = requireTranslation(phrase, 'recall');
+  const translationBuf = await decodeAudio(ctx, getAudioUrl(translationKey));
   const normalBuf = await decodeAudio(ctx, getAudioUrl(phrase.normalS3Key));
-  const gapSec = Math.min(
-    RECALL_MAX_GAP_SEC,
-    Math.max(RECALL_MIN_GAP_SEC, translationBuf.duration * RECALL_GAP_MULTIPLIER),
-  );
+  const gapSec = scaledGapSec(translationBuf.duration, RECALL_GAP_MULTIPLIER, RECALL_MIN_GAP_SEC, RECALL_MAX_GAP_SEC);
   return renderSequence([
     { buffer: translationBuf, gapAfterSec: gapSec },
     { buffer: normalBuf, gapAfterSec: 0 },
   ]);
 }
 
+// Recall's translation lead-in (a longer gap, to give more time to recall
+// before the drill reveal), then a full drill rep.
+async function renderRecallDrill(ctx: AudioContext, phrase: Phrase): Promise<AudioBuffer> {
+  const translationKey = requireTranslation(phrase, 'recall drill');
+  const translationBuf = await decodeAudio(ctx, getAudioUrl(translationKey));
+  const normalBuf = await decodeAudio(ctx, getAudioUrl(phrase.normalS3Key));
+  const slowBuf = await decodeAudio(ctx, getAudioUrl(phrase.slowS3Key));
+  const leadInGapSec = scaledGapSec(
+    translationBuf.duration,
+    RECALL_DRILL_GAP_MULTIPLIER,
+    RECALL_DRILL_MIN_GAP_SEC,
+    RECALL_DRILL_MAX_GAP_SEC,
+  );
+  return renderSequence([
+    { buffer: translationBuf, gapAfterSec: leadInGapSec },
+    { buffer: normalBuf, gapAfterSec: DRILL_STEP_GAP_SEC },
+    { buffer: slowBuf, gapAfterSec: DRILL_STEP_GAP_SEC },
+    { buffer: normalBuf, gapAfterSec: 0 },
+  ]);
+}
+
+// Mirror of recall: normal → gap (scaled to give recall time) → translation (the reveal)
+async function renderReverseRecall(ctx: AudioContext, phrase: Phrase): Promise<AudioBuffer> {
+  const translationKey = requireTranslation(phrase, 'reverse recall');
+  const normalBuf = await decodeAudio(ctx, getAudioUrl(phrase.normalS3Key));
+  const translationBuf = await decodeAudio(ctx, getAudioUrl(translationKey));
+  const gapSec = scaledGapSec(normalBuf.duration, RECALL_GAP_MULTIPLIER, RECALL_MIN_GAP_SEC, RECALL_MAX_GAP_SEC);
+  return renderSequence([
+    { buffer: normalBuf, gapAfterSec: gapSec },
+    { buffer: translationBuf, gapAfterSec: 0 },
+  ]);
+}
+
 // Resolves the single AudioBuffer that represents one phrase in the given mode —
-// a plain decode for normal/slow, a rendered multi-clip sequence for drill/recall.
+// a plain decode for normal/slow/fast, a rendered multi-clip sequence otherwise.
 async function renderPhraseSegment(ctx: AudioContext, phrase: Phrase, mode: ExportMode): Promise<AudioBuffer> {
-  if (mode === 'normal') return decodeAudio(ctx, getAudioUrl(phrase.normalS3Key));
+  if (mode === 'normal' || mode === 'fast') return decodeAudio(ctx, getAudioUrl(phrase.normalS3Key));
   if (mode === 'slow') return decodeAudio(ctx, getAudioUrl(phrase.slowS3Key));
   if (mode === 'drill') return renderDrill(ctx, phrase);
-  return renderRecall(ctx, phrase);
+  if (mode === 'fastDrill') return renderFastDrill(ctx, phrase);
+  if (mode === 'recall') return renderRecall(ctx, phrase);
+  if (mode === 'recallDrill') return renderRecallDrill(ctx, phrase);
+  return renderReverseRecall(ctx, phrase);
 }
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -151,7 +221,8 @@ export async function downloadZip(
 ): Promise<ExportResult> {
   const zip = new JSZip();
   const used = new Set<string>();
-  const needsRendering = mode === 'drill' || mode === 'recall';
+  const rawFetchModes: ExportMode[] = ['normal', 'slow', 'fast'];
+  const needsRendering = !rawFetchModes.includes(mode);
   const ctx = needsRendering ? new AudioContext() : null;
   const skipped: ExportResult['skipped'] = [];
 
@@ -160,16 +231,12 @@ export async function downloadZip(
     const name = uniqueName(sanitizeFilename(phrase.translation || phrase.text), used);
 
     try {
-      if (mode === 'normal') {
+      if (mode === 'normal' || mode === 'fast') {
         zip.file(`${name}.mp3`, await fetchBytes(getAudioUrl(phrase.normalS3Key)));
       } else if (mode === 'slow') {
         zip.file(`${name}.mp3`, await fetchBytes(getAudioUrl(phrase.slowS3Key)));
-      } else if (mode === 'drill') {
-        const rendered = await renderDrill(ctx!, phrase);
-        const mp3 = await audioBufferToMp3(rendered);
-        zip.file(`${name}.mp3`, mp3.buffer as ArrayBuffer);
       } else {
-        const rendered = await renderRecall(ctx!, phrase);
+        const rendered = await renderPhraseSegment(ctx!, phrase, mode);
         const mp3 = await audioBufferToMp3(rendered);
         zip.file(`${name}.mp3`, mp3.buffer as ArrayBuffer);
       }
@@ -192,7 +259,7 @@ export async function downloadZip(
 }
 
 // One combined MP3: every phrase's rendered segment for `mode`, back-to-back with
-// PHRASE_GAP_SEC of silence between phrases (no gap after the last one).
+// COMBINED_PHRASE_GAP_SEC[mode] of silence between phrases (no gap after the last one).
 export async function downloadCombined(
   phrases: Phrase[],
   mode: ExportMode,
@@ -206,7 +273,7 @@ export async function downloadCombined(
     const phrase = phrases[pi];
     try {
       const buffer = await renderPhraseSegment(ctx, phrase, mode);
-      segments.push({ buffer, gapAfterSec: PHRASE_GAP_SEC });
+      segments.push({ buffer, gapAfterSec: COMBINED_PHRASE_GAP_SEC[mode] });
     } catch (e) {
       skipped.push({ phrase, reason: e instanceof Error ? e.message : String(e) });
     }

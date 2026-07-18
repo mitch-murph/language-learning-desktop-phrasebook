@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getAudioUrl, type Phrase } from '../../api/client';
 
-export type QueueMode = 'normal' | 'slow' | 'drill' | 'recall' | 'recallDrill';
+export type QueueMode = 'normal' | 'slow' | 'fast' | 'drill' | 'fastDrill' | 'recall' | 'recallDrill' | 'reverseRecall';
 
 interface Segment {
   kind: 'audio' | 'gap';
@@ -28,6 +28,11 @@ const SEQUENCES: Record<QueueMode, Segment[]> = {
     { kind: 'audio', src: 'slow' },
     { kind: 'gap', scale: 1.2, minMs: 1500 },
   ],
+  // Same clip as normal, just a much shorter gap before the next phrase.
+  fast: [
+    { kind: 'audio', src: 'normal' },
+    { kind: 'gap', scale: 0.12, minMs: 120, maxMs: 400 },
+  ],
   drill: [
     { kind: 'audio', src: 'normal' },
     { kind: 'gap', scale: 0.6, minMs: 700 },
@@ -35,6 +40,15 @@ const SEQUENCES: Record<QueueMode, Segment[]> = {
     { kind: 'gap', scale: 0.6, minMs: 700 },
     { kind: 'audio', src: 'normal' },
     { kind: 'gap', scale: 1.2, minMs: 1500 },
+  ],
+  // The drill sequence with fast-style compressed gaps throughout.
+  fastDrill: [
+    { kind: 'audio', src: 'normal' },
+    { kind: 'gap', scale: 0.12, minMs: 120, maxMs: 400 },
+    { kind: 'audio', src: 'slow' },
+    { kind: 'gap', scale: 0.12, minMs: 120, maxMs: 400 },
+    { kind: 'audio', src: 'normal' },
+    { kind: 'gap', scale: 0.12, minMs: 120, maxMs: 400 },
   ],
   recall: [
     { kind: 'audio', src: 'translation' },
@@ -53,6 +67,14 @@ const SEQUENCES: Record<QueueMode, Segment[]> = {
     { kind: 'gap', scale: 0.6, minMs: 700 },
     { kind: 'audio', src: 'normal' },
     { kind: 'gap', scale: 1.2, minMs: 1500 },
+  ],
+  // Mirror of recall: the native phrase plays first, then the translation as
+  // the reveal (recall's order is translation -> normal).
+  reverseRecall: [
+    { kind: 'audio', src: 'normal' },
+    { kind: 'gap', scale: 2.5, minMs: 4000, maxMs: 12000 },
+    { kind: 'audio', src: 'translation' },
+    { kind: 'gap', scale: 1.5, minMs: 2000 },
   ],
 };
 

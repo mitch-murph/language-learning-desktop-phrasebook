@@ -4,9 +4,12 @@ import type { QueueMode } from './useQueuePlayer';
 const MODE_LABEL: Record<QueueMode, string> = {
   normal: 'Normal',
   slow: 'Slow',
+  fast: 'Fast',
   drill: 'Drill',
+  fastDrill: 'Fast Drill',
   recall: 'Recall',
   recallDrill: 'Recall Drill',
+  reverseRecall: 'Reverse Recall',
 };
 
 interface Props {
@@ -43,13 +46,13 @@ export default function QueuePlayerBar({
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-4 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] backdrop-blur">
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-4">
-        <div className="flex items-center gap-1">
+        <div className="grid grid-cols-4 gap-1">
           {(Object.keys(MODE_LABEL) as QueueMode[]).map(m => (
             <button
               key={m}
               type="button"
               onClick={() => onSetMode(m)}
-              className={`rounded px-3 py-1.5 text-sm font-medium ${
+              className={`whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium ${
                 mode === m ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
