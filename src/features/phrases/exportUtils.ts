@@ -2,11 +2,14 @@ import JSZip from 'jszip';
 import { getAudioUrl, type Phrase } from '../../api/client';
 
 export type ExportMode = 'normal' | 'slow' | 'drill' | 'recall';
+export type ExportStage = 'fetch' | 'encode';
+export type ExportProgressCallback = (done: number, total: number, stage: ExportStage) => void;
 
 const DRILL_STEP_GAP_SEC = 2;
 const RECALL_MIN_GAP_SEC = 4;
 const RECALL_MAX_GAP_SEC = 12;
 const RECALL_GAP_MULTIPLIER = 2.5;
+const PHRASE_GAP_SEC = 3;
 const MP3_BITRATE = 128;
 const MP3_BLOCK_SIZE = 1152; // samples per LAME frame
 
@@ -117,6 +120,15 @@ async function renderRecall(ctx: AudioContext, phrase: Phrase): Promise<AudioBuf
   ]);
 }
 
+// Resolves the single AudioBuffer that represents one phrase in the given mode —
+// a plain decode for normal/slow, a rendered multi-clip sequence for drill/recall.
+async function renderPhraseSegment(ctx: AudioContext, phrase: Phrase, mode: ExportMode): Promise<AudioBuffer> {
+  if (mode === 'normal') return decodeAudio(ctx, getAudioUrl(phrase.normalS3Key));
+  if (mode === 'slow') return decodeAudio(ctx, getAudioUrl(phrase.slowS3Key));
+  if (mode === 'drill') return renderDrill(ctx, phrase);
+  return renderRecall(ctx, phrase);
+}
+
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -135,7 +147,7 @@ export interface ExportResult {
 export async function downloadZip(
   phrases: Phrase[],
   mode: ExportMode,
-  onProgress: (done: number, total: number) => void,
+  onProgress: ExportProgressCallback,
 ): Promise<ExportResult> {
   const zip = new JSZip();
   const used = new Set<string>();
@@ -166,7 +178,7 @@ export async function downloadZip(
       skipped.push({ phrase, reason: e instanceof Error ? e.message : String(e) });
     }
 
-    onProgress(pi + 1, phrases.length);
+    onProgress(pi + 1, phrases.length, 'fetch');
   }
 
   ctx?.close();
@@ -175,6 +187,41 @@ export async function downloadZip(
     const blob = await zip.generateAsync({ type: 'blob' });
     triggerDownload(blob, `phrases-${mode}.zip`);
   }
+
+  return { skipped };
+}
+
+// One combined MP3: every phrase's rendered segment for `mode`, back-to-back with
+// PHRASE_GAP_SEC of silence between phrases (no gap after the last one).
+export async function downloadCombined(
+  phrases: Phrase[],
+  mode: ExportMode,
+  onProgress: ExportProgressCallback,
+): Promise<ExportResult> {
+  const ctx = new AudioContext();
+  const skipped: ExportResult['skipped'] = [];
+  const segments: { buffer: AudioBuffer; gapAfterSec: number }[] = [];
+
+  for (let pi = 0; pi < phrases.length; pi++) {
+    const phrase = phrases[pi];
+    try {
+      const buffer = await renderPhraseSegment(ctx, phrase, mode);
+      segments.push({ buffer, gapAfterSec: PHRASE_GAP_SEC });
+    } catch (e) {
+      skipped.push({ phrase, reason: e instanceof Error ? e.message : String(e) });
+    }
+    onProgress(pi + 1, phrases.length, 'fetch');
+  }
+
+  ctx.close();
+
+  if (segments.length === 0) return { skipped };
+  segments[segments.length - 1].gapAfterSec = 0;
+
+  onProgress(phrases.length, phrases.length, 'encode');
+  const rendered = await renderSequence(segments);
+  const mp3 = await audioBufferToMp3(rendered);
+  triggerDownload(new Blob([mp3.buffer as ArrayBuffer], { type: 'audio/mpeg' }), `phrases-${mode}-combined.mp3`);
 
   return { skipped };
 }

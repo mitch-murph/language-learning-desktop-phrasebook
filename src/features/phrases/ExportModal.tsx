@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Phrase } from '../../api/client';
-import { downloadZip, type ExportMode } from './exportUtils';
+import { downloadCombined, downloadZip, type ExportMode, type ExportResult, type ExportStage } from './exportUtils';
 
 const MODE_INFO: Record<ExportMode, { label: string; description: string }> = {
   normal: { label: 'Normal', description: 'One file per phrase at normal speed.' },
@@ -20,17 +20,17 @@ interface Props {
 
 export default function ExportModal({ phrases, onClose }: Props) {
   const [mode, setMode] = useState<ExportMode>('normal');
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number; stage: ExportStage } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [skipped, setSkipped] = useState<{ phrase: Phrase; reason: string }[]>([]);
   const busy = progress !== null;
 
-  async function run() {
+  async function run(exporter: (onProgress: (done: number, total: number, stage: ExportStage) => void) => Promise<ExportResult>) {
     setError(null);
     setSkipped([]);
-    setProgress({ done: 0, total: phrases.length });
+    setProgress({ done: 0, total: phrases.length, stage: 'fetch' });
     try {
-      const result = await downloadZip(phrases, mode, (done, total) => setProgress({ done, total }));
+      const result = await exporter((done, total, stage) => setProgress({ done, total, stage }));
       setSkipped(result.skipped);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -38,6 +38,9 @@ export default function ExportModal({ phrases, onClose }: Props) {
       setProgress(null);
     }
   }
+
+  const runZip = () => run(onProgress => downloadZip(phrases, mode, onProgress));
+  const runCombined = () => run(onProgress => downloadCombined(phrases, mode, onProgress));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
@@ -67,9 +70,31 @@ export default function ExportModal({ phrases, onClose }: Props) {
             </label>
           ))}
         </div>
-        <p className="mb-4 text-xs text-slate-500">{MODE_INFO[mode].description}</p>
+        <p className="mb-1 text-xs text-slate-500">{MODE_INFO[mode].description}</p>
+        <p className="mb-4 text-xs text-slate-400">
+          Combined joins every phrase into one MP3 with a 3s gap between phrases; ZIP gives one MP3 file per phrase.
+        </p>
 
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={runZip}
+            disabled={busy || phrases.length === 0}
+            className="flex-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {busy ? 'Exporting…' : 'Download ZIP'}
+          </button>
+          <button
+            type="button"
+            onClick={runCombined}
+            disabled={busy || phrases.length === 0}
+            className="flex-1 rounded-md border border-blue-600 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+          >
+            {busy ? 'Exporting…' : 'Combined MP3'}
+          </button>
+        </div>
+
+        <div className="mt-2 flex gap-2">
           <button
             type="button"
             onClick={onClose}
@@ -78,14 +103,6 @@ export default function ExportModal({ phrases, onClose }: Props) {
           >
             Close
           </button>
-          <button
-            type="button"
-            onClick={run}
-            disabled={busy || phrases.length === 0}
-            className="flex-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {busy ? 'Exporting…' : 'Download ZIP'}
-          </button>
         </div>
 
         {progress && (
@@ -93,11 +110,11 @@ export default function ExportModal({ phrases, onClose }: Props) {
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
               <div
                 className="h-full bg-blue-600 transition-all"
-                style={{ width: `${(progress.done / progress.total) * 100}%` }}
+                style={{ width: `${progress.stage === 'encode' ? 100 : (progress.done / progress.total) * 100}%` }}
               />
             </div>
             <p className="mt-1 text-center text-xs text-slate-400">
-              {progress.done} / {progress.total}
+              {progress.stage === 'encode' ? 'Encoding MP3…' : `${progress.done} / ${progress.total}`}
             </p>
           </div>
         )}

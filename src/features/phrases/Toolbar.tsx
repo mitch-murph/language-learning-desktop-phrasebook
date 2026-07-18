@@ -116,9 +116,6 @@ export default function Toolbar({
       >
         Export{selectedCount > 0 ? ` ${selectedCount} selected` : ` all ${count}`}
       </button>
-      <span className="ml-auto min-w-[90px] whitespace-nowrap text-right text-sm tabular-nums text-slate-500">
-        {count} phrase{count === 1 ? '' : 's'}
-      </span>
     </div>
   );
 }
