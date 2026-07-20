@@ -95,7 +95,11 @@ async function audioBufferToMp3(buffer: AudioBuffer): Promise<Uint8Array> {
 
 function renderSequence(segments: { buffer: AudioBuffer; gapAfterSec: number }[]): Promise<AudioBuffer> {
   const totalSec = segments.reduce((s, seg) => s + seg.buffer.duration + seg.gapAfterSec, 0);
-  const sampleRate = 44100;
+  // Match the decoded buffers' own sample rate instead of hardcoding one — mixing a
+  // buffer into an OfflineAudioContext running at a different rate forces the browser
+  // to resample on the fly, which some mobile browsers audibly distort. All segments
+  // here were decoded via the same AudioContext, so they already share one rate.
+  const sampleRate = segments[0].buffer.sampleRate;
   const offline = new OfflineAudioContext(1, Math.ceil(totalSec * sampleRate), sampleRate);
 
   let offsetSec = 0;
