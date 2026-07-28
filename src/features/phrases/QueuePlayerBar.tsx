@@ -19,6 +19,8 @@ interface Props {
   playing: boolean;
   mode: QueueMode;
   volume: number;
+  bufferedCount: number;
+  bufferTotal: number;
   onSetMode: (m: QueueMode) => void;
   onTogglePlay: () => void;
   onSkipNext: () => void;
@@ -34,6 +36,8 @@ export default function QueuePlayerBar({
   playing,
   mode,
   volume,
+  bufferedCount,
+  bufferTotal,
   onSetMode,
   onTogglePlay,
   onSkipNext,
@@ -99,6 +103,14 @@ export default function QueuePlayerBar({
 
         <span className="whitespace-nowrap text-right text-xs tabular-nums text-slate-400">
           {index + 1} / {total}
+        </span>
+
+        <span
+          className={`min-w-[110px] whitespace-nowrap text-right text-xs tabular-nums text-amber-600 ${
+            bufferedCount >= bufferTotal ? 'invisible pointer-events-none' : ''
+          }`}
+        >
+          Buffering {bufferedCount}/{bufferTotal}
         </span>
 
         <input

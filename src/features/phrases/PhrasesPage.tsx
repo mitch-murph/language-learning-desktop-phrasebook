@@ -186,6 +186,8 @@ export default function PhrasesPage() {
           playing={queuePlayer.playing}
           mode={playMode}
           volume={queuePlayer.volume}
+          bufferedCount={queuePlayer.bufferedCount}
+          bufferTotal={queuePlayer.bufferTotal}
           onSetMode={setPlayMode}
           onTogglePlay={queuePlayer.togglePlay}
           onSkipNext={queuePlayer.skipNext}

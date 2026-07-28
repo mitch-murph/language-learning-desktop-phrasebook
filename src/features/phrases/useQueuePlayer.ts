@@ -84,6 +84,19 @@ function audioUrl(phrase: Phrase, src: 'normal' | 'slow' | 'translation'): strin
   return phrase.translationS3Key ? getAudioUrl(phrase.translationS3Key) : undefined;
 }
 
+// Which clip kinds a mode's sequence actually touches, so prefetching only
+// fetches what this mode will play (e.g. 'normal' doesn't bother with the
+// 'slow' clip that 'drill' needs).
+function neededKinds(mode: QueueMode): Array<'normal' | 'slow' | 'translation'> {
+  const kinds = new Set<'normal' | 'slow' | 'translation'>();
+  for (const seg of SEQUENCES[mode]) {
+    if (seg.kind === 'audio' && seg.src) kinds.add(seg.src);
+  }
+  return [...kinds];
+}
+
+const PREFETCH_CONCURRENCY = 4;
+
 // A silent looping clip to keep the <audio> element "playing" through gaps
 // between phrases. If the element actually pauses during a gap, macOS/Chrome
 // treat the tab's media session as inactive, so a hardware Play/Pause press
@@ -135,6 +148,8 @@ export interface QueuePlayerApi {
   skipNext: () => void;
   skipPrev: () => void;
   togglePlay: () => void;
+  bufferedCount: number;
+  bufferTotal: number;
 }
 
 // Plays `queue` on an endless loop (wrapping to the start after the last
@@ -183,6 +198,90 @@ export function useQueuePlayer(queue: Phrase[], mode: QueueMode): QueuePlayerApi
     return audioRef.current;
   }
 
+  // Prefetch-to-blob buffer: on flaky connections (e.g. a subway tunnel),
+  // fetching each clip live as the queue reaches it means a dead zone kills
+  // playback. Instead we fetch every clip this queue+mode will need as a
+  // blob up front and key the cache by the clip's direct S3 URL; segment
+  // playback below prefers the cached blob: URL and only falls back to the
+  // live URL for whatever hasn't finished prefetching yet.
+  const blobCacheRef = useRef<Map<string, string>>(new Map());
+  const prefetchGenRef = useRef(0);
+  const [bufferedCount, setBufferedCount] = useState(0);
+  const [bufferTotal, setBufferTotal] = useState(0);
+
+  useEffect(() => {
+    const gen = ++prefetchGenRef.current;
+    const kinds = neededKinds(mode);
+    const tasks: string[] = [];
+    const needed = new Set<string>();
+    for (const phrase of queue) {
+      for (const kind of kinds) {
+        const url = audioUrl(phrase, kind);
+        if (url && !needed.has(url)) {
+          needed.add(url);
+          tasks.push(url);
+        }
+      }
+    }
+
+    // Drop cached clips this queue/mode no longer needs (a new queue, or a
+    // mode switch that dropped a clip kind) so the buffer doesn't grow
+    // forever across sessions. Never revoke the URL currently loaded on the
+    // audio element — that would cut off whatever's playing right now.
+    const currentSrc = audioRef.current?.src;
+    for (const [url, blobUrl] of blobCacheRef.current) {
+      if (!needed.has(url) && blobUrl !== currentSrc) {
+        URL.revokeObjectURL(blobUrl);
+        blobCacheRef.current.delete(url);
+      }
+    }
+
+    setBufferTotal(tasks.length);
+    setBufferedCount(tasks.filter(url => blobCacheRef.current.has(url)).length);
+    if (tasks.length === 0) return;
+
+    let cancelled = false;
+    let cursor = 0;
+    let active = 0;
+
+    function pump() {
+      if (cancelled || gen !== prefetchGenRef.current) return;
+      while (active < PREFETCH_CONCURRENCY && cursor < tasks.length) {
+        const url = tasks[cursor++];
+        if (blobCacheRef.current.has(url)) continue;
+        active++;
+        fetch(url)
+          .then(res => (res.ok ? res.blob() : Promise.reject(new Error(`buffer fetch failed (${res.status})`))))
+          .then(blob => {
+            if (cancelled || gen !== prefetchGenRef.current) return;
+            blobCacheRef.current.set(url, URL.createObjectURL(blob));
+            setBufferedCount(c => c + 1);
+          })
+          .catch(() => {
+            // Leave it uncached — playback falls back to the live URL for
+            // this clip, same as before this buffer existed.
+          })
+          .finally(() => {
+            active--;
+            pump();
+          });
+      }
+    }
+    pump();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queue, mode]);
+
+  // Release every buffered blob when the player itself unmounts.
+  useEffect(() => {
+    return () => {
+      for (const blobUrl of blobCacheRef.current.values()) URL.revokeObjectURL(blobUrl);
+      blobCacheRef.current.clear();
+    };
+  }, []);
+
   const clearTimer = () => {
     if (timerRef.current != null) {
       window.clearTimeout(timerRef.current);
@@ -225,11 +324,12 @@ export function useQueuePlayer(queue: Phrase[], mode: QueueMode): QueuePlayerApi
     const a = getAudio();
 
     if (seg.kind === 'audio') {
-      const url = audioUrl(phrase, seg.src!);
-      if (!url) {
+      const directUrl = audioUrl(phrase, seg.src!);
+      if (!directUrl) {
         startSegmentRef.current(i + 1);
         return;
       }
+      const url = blobCacheRef.current.get(directUrl) ?? directUrl;
       a.loop = false;
       if (a.src !== url) a.src = url;
       try {
@@ -437,5 +537,7 @@ export function useQueuePlayer(queue: Phrase[], mode: QueueMode): QueuePlayerApi
     skipNext: () => advanceRef.current(1),
     skipPrev: () => advanceRef.current(-1),
     togglePlay: () => setPlaying(p => !p),
+    bufferedCount,
+    bufferTotal,
   };
 }
