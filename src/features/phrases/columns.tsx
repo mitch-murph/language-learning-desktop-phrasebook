@@ -129,7 +129,7 @@ export function buildColumns({
             onCommit={v => onPatch(row.phraseId, { translation: v })}
           />
         ) : (
-          <span className="block truncate text-sm" title={info.getValue() || undefined}>
+          <span className="block truncate text-sm text-slate-500" title={info.getValue() || undefined}>
             {info.getValue() || <span className="text-slate-300">—</span>}
           </span>
         );
@@ -141,7 +141,7 @@ export function buildColumns({
       cell: info => {
         const row = info.row.original;
         const content = (
-          <span className="block truncate text-sm" title={info.getValue()}>
+          <span className="block truncate text-sm font-medium text-slate-800" title={info.getValue()}>
             {info.getValue()}
           </span>
         );

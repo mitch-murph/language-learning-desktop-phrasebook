@@ -176,7 +176,12 @@ export default function PhrasesPage() {
         onShuffleChange={setShuffleQueue}
         onPlay={startQueue}
       />
-      <PhraseTable data={filtered} columns={columns} playingRowId={queue.length > 0 ? queuePlayer.phrase?.phraseId : null} />
+      <PhraseTable
+        data={filtered}
+        columns={columns}
+        playingRowId={queue.length > 0 ? queuePlayer.phrase?.phraseId : null}
+        editMode={editMode}
+      />
       {showExport && <ExportModal phrases={exportTargets} onClose={() => setShowExport(false)} />}
       {queue.length > 0 && (
         <QueuePlayerBar
