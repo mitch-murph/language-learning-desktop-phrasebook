@@ -25,6 +25,23 @@ export const COLUMN_IDS = [
 ] as const;
 export type ColumnId = (typeof COLUMN_IDS)[number];
 
+// Columns a user can toggle off via the Columns menu. `select` is excluded —
+// it's the mechanism selection depends on, so it always stays visible.
+export const TOGGLEABLE_COLUMN_IDS = COLUMN_IDS.filter(id => id !== 'select');
+
+export const COLUMN_LABELS: Record<ColumnId, string> = {
+  select: '',
+  languageName: 'Language',
+  translation: 'Translation',
+  text: 'Phrase',
+  transcription: 'Romanization',
+  tags: 'Tags',
+  audio: 'Audio',
+  createdAt: 'Saved',
+  hide: 'Visibility',
+  actions: 'Actions',
+};
+
 function RevealButton({ onClick }: { onClick: () => void }) {
   return (
     <button

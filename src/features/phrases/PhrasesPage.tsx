@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { VisibilityState } from '@tanstack/react-table';
 import { getAudioUrl, type Phrase } from '../../api/client';
 import { usePhrases } from './usePhrases';
 import { useAudioPlayer } from './useAudioPlayer';
@@ -11,6 +12,17 @@ import ExportModal from './ExportModal';
 import QueuePlayerBar from './QueuePlayerBar';
 
 const NO_HIDDEN: Record<StudyColumn, boolean> = { text: false, transcription: false, translation: false };
+
+const COLUMN_VISIBILITY_KEY = 'phrasebook.columnVisibility';
+
+function loadColumnVisibility(): VisibilityState {
+  try {
+    const raw = localStorage.getItem(COLUMN_VISIBILITY_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
 
 function shuffled<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -29,6 +41,12 @@ export default function PhrasesPage() {
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(true);
+  const [columnVisibility, setColumnVisibilityState] = useState<VisibilityState>(loadColumnVisibility);
+
+  function setColumnVisibility(v: VisibilityState) {
+    setColumnVisibilityState(v);
+    localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(v));
+  }
 
   const [editMode, setEditMode] = useState(false);
   const [hidden, setHidden] = useState<Record<StudyColumn, boolean>>(NO_HIDDEN);
@@ -166,6 +184,8 @@ export default function PhrasesPage() {
         tagOptions={tags}
         showHidden={showHidden}
         onShowHiddenChange={setShowHidden}
+        columnVisibility={columnVisibility}
+        onColumnVisibilityChange={setColumnVisibility}
         count={filtered.length}
         selectedCount={selected.size}
         onClearSelection={() => setSelected(new Set())}
@@ -181,6 +201,8 @@ export default function PhrasesPage() {
         columns={columns}
         playingRowId={queue.length > 0 ? queuePlayer.phrase?.phraseId : null}
         editMode={editMode}
+        columnVisibility={columnVisibility}
+        onColumnVisibilityChange={setColumnVisibility}
       />
       {showExport && <ExportModal phrases={exportTargets} onClose={() => setShowExport(false)} />}
       {queue.length > 0 && (

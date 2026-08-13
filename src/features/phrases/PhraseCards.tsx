@@ -8,8 +8,12 @@ interface Props {
   editMode: boolean;
 }
 
+// Uses getAllCells(), not getVisibleCells() — the desktop Columns menu
+// (which drives table column visibility) addresses horizontal table width,
+// a problem the stacked card layout doesn't have, so cards always show every
+// field regardless of what's hidden in the table.
 function renderCell(row: Row<Phrase>, id: ColumnId) {
-  const cell = row.getVisibleCells().find(c => c.column.id === id)!;
+  const cell = row.getAllCells().find(c => c.column.id === id)!;
   return flexRender(cell.column.columnDef.cell, cell.getContext());
 }
 

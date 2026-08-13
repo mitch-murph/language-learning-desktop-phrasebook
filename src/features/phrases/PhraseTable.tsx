@@ -6,6 +6,7 @@ import {
   useReactTable,
   type ColumnDef,
   type SortingState,
+  type VisibilityState,
 } from '@tanstack/react-table';
 import type { Phrase } from '../../api/client';
 import type { ColumnId } from './columns';
@@ -16,44 +17,61 @@ interface Props {
   columns: ColumnDef<Phrase, any>[];
   playingRowId?: string | null;
   editMode: boolean;
+  columnVisibility: VisibilityState;
+  onColumnVisibilityChange: (v: VisibilityState) => void;
 }
 
-// Proportional per-column widths (sum to 100%) so toggling edit mode or
-// hiding columns never changes column widths — only the cell contents
-// change — and the table fills its container exactly instead of forcing
-// horizontal scroll at every width. Keyed by ColumnId so adding/renaming a
-// column in columns.tsx without updating this map is a compile error rather
-// than a silent fallback to the default width. TABLE_MIN_WIDTH is a floor
-// below which columns would be squeezed unreadably thin; narrower windows
-// scroll horizontally instead.
-const COLUMN_WIDTHS: Record<ColumnId, string> = {
-  select: '3%',
-  languageName: '10%',
-  translation: '15%',
-  text: '15%',
-  transcription: '13%',
-  tags: '14%',
-  audio: '11%',
-  createdAt: '7%',
-  hide: '6%',
-  actions: '6%',
+// Relative column-width weights (not percentages) so hiding a column via the
+// Columns menu lets the remaining visible columns expand to fill the freed
+// space instead of leaving dead space or forcing scroll. Widths are
+// recomputed below as each column's weight over the sum of *visible*
+// columns' weights. Keyed by ColumnId so adding/renaming a column in
+// columns.tsx without updating this map is a compile error rather than a
+// silent fallback to the default weight. TABLE_MIN_WIDTH is a floor below
+// which columns would be squeezed unreadably thin; narrower windows scroll
+// horizontally instead.
+const COLUMN_WEIGHTS: Record<ColumnId, number> = {
+  select: 3,
+  languageName: 10,
+  translation: 15,
+  text: 15,
+  transcription: 13,
+  tags: 14,
+  audio: 11,
+  createdAt: 7,
+  hide: 6,
+  actions: 6,
 };
 const TABLE_MIN_WIDTH = 900;
 
-export default function PhraseTable({ data, columns, playingRowId, editMode }: Props) {
+export default function PhraseTable({
+  data,
+  columns,
+  playingRowId,
+  editMode,
+  columnVisibility,
+  onColumnVisibilityChange,
+}: Props) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: { sorting, columnVisibility },
     onSortingChange: setSorting,
+    onColumnVisibilityChange: updater =>
+      onColumnVisibilityChange(updater instanceof Function ? updater(columnVisibility) : updater),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getRowId: row => row.phraseId,
   });
 
   const rows = table.getRowModel().rows;
+  const visibleLeafColumns = table.getVisibleLeafColumns();
+  const totalWeight = visibleLeafColumns.reduce(
+    (sum, col) => sum + (COLUMN_WEIGHTS[col.id as ColumnId] ?? 10),
+    0,
+  );
 
   if (rows.length === 0) {
     return (
@@ -68,9 +86,10 @@ export default function PhraseTable({ data, columns, playingRowId, editMode }: P
       <div className="hidden overflow-x-auto rounded-lg border border-slate-200 sm:block">
         <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: TABLE_MIN_WIDTH }}>
           <colgroup>
-            {table.getAllLeafColumns().map(col => (
-              <col key={col.id} style={{ width: COLUMN_WIDTHS[col.id as ColumnId] ?? '10%' }} />
-            ))}
+            {visibleLeafColumns.map(col => {
+              const weight = COLUMN_WEIGHTS[col.id as ColumnId] ?? 10;
+              return <col key={col.id} style={{ width: `${(weight / totalWeight) * 100}%` }} />;
+            })}
           </colgroup>
           <thead>
             {table.getHeaderGroups().map(headerGroup => (
