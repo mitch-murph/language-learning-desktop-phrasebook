@@ -259,6 +259,7 @@ export function buildColumns({
         return (
           <button
             type="button"
+            onMouseDown={e => e.preventDefault()}
             onClick={() => {
               if (window.confirm(`Delete "${info.row.original.text}"?`)) onDelete(info.row.original.phraseId);
             }}
