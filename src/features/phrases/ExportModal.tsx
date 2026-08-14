@@ -31,17 +31,36 @@ const MODE_INFO: Record<ExportMode, { label: string; description: string }> = {
   },
 };
 
+const ALBUM_STORAGE_KEY = 'phrasebook:exportAlbum';
+
+// Keyed per-language (or "mixed") so each language remembers its own last-used
+// album name instead of one export's edit clobbering the default for every language.
+function albumDefaults(phrases: Phrase[]): { storageKey: string; name: string } {
+  const languages = [...new Set(phrases.map(p => p.languageName))];
+  if (languages.length === 1) {
+    return { storageKey: `${ALBUM_STORAGE_KEY}:${languages[0]}`, name: `Phrasebook - ${languages[0]}` };
+  }
+  return { storageKey: `${ALBUM_STORAGE_KEY}:mixed`, name: 'Phrasebook' };
+}
+
 interface Props {
   phrases: Phrase[];
   onClose: () => void;
 }
 
 export default function ExportModal({ phrases, onClose }: Props) {
+  const { storageKey: albumStorageKey, name: defaultAlbum } = albumDefaults(phrases);
   const [mode, setMode] = useState<ExportMode>('normal');
+  const [album, setAlbum] = useState(() => localStorage.getItem(albumStorageKey) ?? defaultAlbum);
   const [progress, setProgress] = useState<{ done: number; total: number; stage: ExportStage } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [skipped, setSkipped] = useState<{ phrase: Phrase; reason: string }[]>([]);
   const busy = progress !== null;
+
+  function updateAlbum(value: string) {
+    setAlbum(value);
+    localStorage.setItem(albumStorageKey, value);
+  }
 
   async function run(exporter: (onProgress: (done: number, total: number, stage: ExportStage) => void) => Promise<ExportResult>) {
     setError(null);
@@ -57,8 +76,8 @@ export default function ExportModal({ phrases, onClose }: Props) {
     }
   }
 
-  const runZip = () => run(onProgress => downloadZip(phrases, mode, onProgress));
-  const runCombined = () => run(onProgress => downloadCombined(phrases, mode, onProgress));
+  const runZip = () => run(onProgress => downloadZip(phrases, mode, album.trim() || defaultAlbum, onProgress));
+  const runCombined = () => run(onProgress => downloadCombined(phrases, mode, album.trim() || defaultAlbum, onProgress));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
@@ -66,6 +85,22 @@ export default function ExportModal({ phrases, onClose }: Props) {
         <h2 className="mb-3 text-base font-semibold text-slate-800">
           Export {phrases.length} phrase{phrases.length !== 1 ? 's' : ''}
         </h2>
+
+        <label className="mb-3 block text-xs font-medium text-slate-600">
+          Album tag
+          <input
+            type="text"
+            value={album}
+            onChange={e => updateAlbum(e.target.value)}
+            disabled={busy}
+            placeholder={defaultAlbum}
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-800 disabled:opacity-50"
+          />
+          <span className="mt-1 block font-normal text-slate-400">
+            Written into every exported file's ID3 album tag. Keep this the same across exports so your music app
+            recognizes re-synced phrases instead of duplicating them.
+          </span>
+        </label>
 
         <div className="mb-3 grid grid-cols-2 gap-2">
           {(Object.keys(MODE_INFO) as ExportMode[]).map(m => (

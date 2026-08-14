@@ -17,6 +17,13 @@ const PHRASE_GAP_SEC = 3;
 const MP3_BITRATE = 128;
 const MP3_BLOCK_SIZE = 1152; // samples per LAME frame
 
+// ZIP export gives one file per phrase, which a phone plays back-to-back as separate
+// tracks with zero gap between them. Drill-family modes get lead-in/trail-out silence
+// so consecutive tracks don't run into each other; other modes are quick enough single
+// clips that this hasn't been requested for them.
+const TRACK_PAD_SEC = 1;
+const DRILL_FAMILY_MODES: ExportMode[] = ['drill', 'fastDrill', 'recallDrill'];
+
 // Modes whose combined-export gap between phrases should mirror their much
 // shorter live-playback pause, instead of the standard PHRASE_GAP_SEC.
 const COMBINED_PHRASE_GAP_SEC: Record<ExportMode, number> = {
@@ -70,6 +77,16 @@ function floatToInt16(float32: Float32Array): Int16Array {
   return out;
 }
 
+async function tagMp3(mp3: ArrayBuffer, tags: { title: string; artist: string; album: string; trackNumber?: number }): Promise<ArrayBuffer> {
+  const { ID3Writer } = await import('browser-id3-writer');
+  const writer = new ID3Writer(mp3);
+  writer.setFrame('TIT2', tags.title);
+  writer.setFrame('TPE1', [tags.artist]);
+  writer.setFrame('TALB', tags.album);
+  if (tags.trackNumber !== undefined) writer.setFrame('TRCK', String(tags.trackNumber));
+  return writer.addTag();
+}
+
 async function audioBufferToMp3(buffer: AudioBuffer): Promise<Uint8Array> {
   const { Mp3Encoder } = await import('@breezystack/lamejs');
   const encoder = new Mp3Encoder(1, buffer.sampleRate, MP3_BITRATE);
@@ -111,6 +128,18 @@ function renderSequence(segments: { buffer: AudioBuffer; gapAfterSec: number }[]
     offsetSec += seg.buffer.duration + seg.gapAfterSec;
   }
   return offline.startRendering();
+}
+
+function padSilence(buffer: AudioBuffer, leadSec: number, trailSec: number): Promise<AudioBuffer> {
+  const lead = new AudioBuffer({
+    numberOfChannels: 1,
+    length: Math.ceil(leadSec * buffer.sampleRate),
+    sampleRate: buffer.sampleRate,
+  });
+  return renderSequence([
+    { buffer: lead, gapAfterSec: 0 },
+    { buffer, gapAfterSec: trailSec },
+  ]);
 }
 
 function scaledGapSec(durationSec: number, multiplier: number, minSec: number, maxSec: number): number {
@@ -221,6 +250,7 @@ export interface ExportResult {
 export async function downloadZip(
   phrases: Phrase[],
   mode: ExportMode,
+  album: string,
   onProgress: ExportProgressCallback,
 ): Promise<ExportResult> {
   const zip = new JSZip();
@@ -235,15 +265,24 @@ export async function downloadZip(
     const name = uniqueName(sanitizeFilename(phrase.translation || phrase.text), used);
 
     try {
+      let bytes: ArrayBuffer;
       if (mode === 'normal' || mode === 'fast') {
-        zip.file(`${name}.mp3`, await fetchBytes(getAudioUrl(phrase.normalS3Key)));
+        bytes = await fetchBytes(getAudioUrl(phrase.normalS3Key));
       } else if (mode === 'slow') {
-        zip.file(`${name}.mp3`, await fetchBytes(getAudioUrl(phrase.slowS3Key)));
+        bytes = await fetchBytes(getAudioUrl(phrase.slowS3Key));
       } else {
-        const rendered = await renderPhraseSegment(ctx!, phrase, mode);
+        let rendered = await renderPhraseSegment(ctx!, phrase, mode);
+        if (DRILL_FAMILY_MODES.includes(mode)) rendered = await padSilence(rendered, TRACK_PAD_SEC, TRACK_PAD_SEC);
         const mp3 = await audioBufferToMp3(rendered);
-        zip.file(`${name}.mp3`, mp3.buffer as ArrayBuffer);
+        bytes = mp3.buffer as ArrayBuffer;
       }
+      const tagged = await tagMp3(bytes, {
+        title: phrase.translation || (phrase.nonLatin && phrase.transcription) || phrase.text || 'Phrase',
+        artist: phrase.languageName,
+        album,
+        trackNumber: pi + 1,
+      });
+      zip.file(`${name}.mp3`, tagged);
     } catch (e) {
       used.delete(name);
       skipped.push({ phrase, reason: e instanceof Error ? e.message : String(e) });
@@ -267,6 +306,7 @@ export async function downloadZip(
 export async function downloadCombined(
   phrases: Phrase[],
   mode: ExportMode,
+  album: string,
   onProgress: ExportProgressCallback,
 ): Promise<ExportResult> {
   const ctx = new AudioContext();
@@ -292,7 +332,8 @@ export async function downloadCombined(
   onProgress(phrases.length, phrases.length, 'encode');
   const rendered = await renderSequence(segments);
   const mp3 = await audioBufferToMp3(rendered);
-  triggerDownload(new Blob([mp3.buffer as ArrayBuffer], { type: 'audio/mpeg' }), `phrases-${mode}-combined.mp3`);
+  const tagged = await tagMp3(mp3.buffer as ArrayBuffer, { title: `${album} (combined)`, artist: album, album });
+  triggerDownload(new Blob([tagged], { type: 'audio/mpeg' }), `phrases-${mode}-combined.mp3`);
 
   return { skipped };
 }
