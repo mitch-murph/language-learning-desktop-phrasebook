@@ -23,7 +23,11 @@ export function usePhrases() {
       return list.map(p => (p.phraseId === phraseId ? { ...p, ...fields } : p));
     });
     try {
-      await updatePhrase(phraseId, fields);
+      const saved = await updatePhrase(phraseId, fields);
+      // An older backend ignores `text` without erroring; don't pretend it saved.
+      if (fields.text !== undefined && saved.text !== fields.text) {
+        throw new Error('The server did not save the new text. The backend needs the text-update change deployed.');
+      }
     } catch (e) {
       setPhrases(snapshot);
       setError(e instanceof Error ? e.message : String(e));

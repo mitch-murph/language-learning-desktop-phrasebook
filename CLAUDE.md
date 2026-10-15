@@ -111,12 +111,18 @@ only checks that a token is *present*, not that it's valid; its 500 for a missin
 Prompts, voice and model are hard-coded in `api/tts.ts` (no per-user overrides,
 unlike tts-phrasebook).
 
-**Text and audio are immutable server-side, so "regenerate" = save new + delete old.**
-Editing a phrase's text in edit mode, or the row's regenerate icon, saves a fresh
+**Audio is immutable server-side, so "regenerate" = save new + delete old.**
+The row's regenerate icon saves a fresh
 record (new `phraseId` and `createdAt`, tags/translation/romanization/hide carried
 over) and then deletes the old one. Save-first means a failed delete leaves a
 duplicate rather than losing data. Same text overwrites the same S3 keys, so
 `refreshAudioCache` re-fetches them with `cache: 'reload'`.
+
+Editing the Phrase cell in edit mode is different: it sends a plain `PUT { text }`
+(same record, same audio keys, no TTS), so text and audio may differ until you press
+the row's regenerate icon. This needs the tts-phrasebook backend that accepts `text`
+in the PUT; `usePhrases.patch` rolls back and reports an error if an older backend
+ignores it.
 
 **No waveform scrubber.** One was built (Web Audio API decode → canvas-style
 bar rendering → click/drag to seek) and then deliberately removed at the

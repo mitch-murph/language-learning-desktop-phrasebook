@@ -165,15 +165,15 @@ export function buildColumns({
       header: 'Phrase',
       cell: info => {
         const row = info.row.original;
-        // Text is immutable server-side, so committing a change regenerates the
-        // audio and saves a new record (see PhrasesPage.regenerate).
+        // Editing changes the text only; the audio is kept, so the two can
+        // differ. Use the row's regenerate button to re-synthesize.
         const content = editMode ? (
           <EditableText
             value={info.getValue()}
             placeholder="phrase"
             disabled={regenerating.has(row.phraseId)}
             onCommit={v => {
-              if (v.trim()) onRegenerate(row, v.trim());
+              if (v.trim() && v.trim() !== row.text) onPatch(row.phraseId, { text: v.trim() });
             }}
           />
         ) : (

@@ -22,6 +22,7 @@ export interface Phrase {
 }
 
 export interface PhrasePatch {
+  text?: string;
   transcription?: string;
   translation?: string;
   tags?: string[];
