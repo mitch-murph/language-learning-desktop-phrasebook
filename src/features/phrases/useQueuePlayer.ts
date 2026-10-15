@@ -3,6 +3,19 @@ import { getAudioUrl, type Phrase } from '../../api/client';
 
 export type QueueMode = 'normal' | 'slow' | 'fast' | 'drill' | 'fastDrill' | 'recall' | 'recallDrill' | 'reverseRecall';
 
+// Display names, in the order modes are offered in menus.
+export const QUEUE_MODE_LABEL: Record<QueueMode, string> = {
+  normal: 'Normal',
+  slow: 'Slow',
+  fast: 'Fast',
+  drill: 'Drill',
+  fastDrill: 'Fast Drill',
+  recall: 'Recall',
+  recallDrill: 'Recall Drill',
+  reverseRecall: 'Reverse Recall',
+};
+export const QUEUE_MODES = Object.keys(QUEUE_MODE_LABEL) as QueueMode[];
+
 interface Segment {
   kind: 'audio' | 'gap';
   src?: 'normal' | 'slow' | 'translation';

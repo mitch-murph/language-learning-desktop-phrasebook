@@ -8,6 +8,7 @@ import PlayButton from './PlayButton';
 const columnHelper = createColumnHelper<Phrase>();
 
 export type StudyColumn = 'text' | 'transcription' | 'translation';
+export const STUDY_COLUMN_IDS: readonly StudyColumn[] = ['translation', 'text', 'transcription'];
 
 // Kept as a single source of truth for column ids so PhraseTable's fixed
 // column widths are checked against this list at compile time.
@@ -26,8 +27,9 @@ export const COLUMN_IDS = [
 export type ColumnId = (typeof COLUMN_IDS)[number];
 
 // Columns a user can toggle off via the Columns menu. `select` is excluded —
-// it's the mechanism selection depends on, so it always stays visible.
-export const TOGGLEABLE_COLUMN_IDS = COLUMN_IDS.filter(id => id !== 'select');
+// it's the mechanism selection depends on — and `actions`, whose header hosts
+// the Columns gear and edit lock themselves; both always stay visible.
+export const TOGGLEABLE_COLUMN_IDS = COLUMN_IDS.filter(id => id !== 'select' && id !== 'actions');
 
 export const COLUMN_LABELS: Record<ColumnId, string> = {
   select: '',
@@ -113,6 +115,7 @@ export function buildColumns({
       cell: info => (
         <input
           type="checkbox"
+          className="max-sm:h-5 max-sm:w-5"
           checked={selected.has(info.row.original.phraseId)}
           onChange={() => onToggleSelect(info.row.original.phraseId)}
           aria-label={`Select ${info.row.original.text}`}

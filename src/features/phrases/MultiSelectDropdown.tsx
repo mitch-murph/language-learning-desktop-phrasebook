@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useClickOutside } from './useClickOutside';
 
 interface Props {
   label: string;
@@ -11,14 +12,7 @@ export default function MultiSelectDropdown({ label, options, selected, onChange
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function onDocMouseDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onDocMouseDown);
-    return () => document.removeEventListener('mousedown', onDocMouseDown);
-  }, [open]);
+  useClickOutside([ref], open, () => setOpen(false));
 
   function toggleValue(value: string) {
     onChange(selected.includes(value) ? selected.filter(v => v !== value) : [...selected, value]);
@@ -32,11 +26,11 @@ export default function MultiSelectDropdown({ label, options, selected, onChange
         : `${selected.length} ${label}`;
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative min-w-0 flex-1 sm:flex-none">
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="w-36 truncate whitespace-nowrap rounded-md border border-slate-300 px-2 py-1.5 text-left text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+        className="w-full truncate sm:w-36 whitespace-nowrap rounded-md border border-slate-300 px-2 py-1.5 text-left text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
       >
         {summary}
       </button>

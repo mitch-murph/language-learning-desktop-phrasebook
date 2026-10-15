@@ -52,8 +52,14 @@ src/
     ├── useAudioPlayer.ts          ← single shared <Audio>, playingKey, play()/toggle-per-pace
     ├── columns.tsx                ← TanStack column defs; exports ColumnId union + StudyColumn type
     ├── PhraseTable.tsx            ← <table> rendering, fixed row height, proportional column widths
-    ├── Toolbar.tsx                ← search/language/tag filters, selection count, Export button
-    ├── StudyBar.tsx               ← edit-mode lock toggle + per-column "hide for quiz" checkboxes
+    ├── Toolbar.tsx                ← sticky filter + play/export rows; publishes its height as --toolbar-h for the sticky table header
+    ├── PlaySplitButton.tsx        ← "Play all N | mode ▾" split button (mode + shuffle live in its menu)
+    ├── TableSettingsMenu.tsx      ← gear in the table header: column visibility + show-hidden (portaled menu)
+    ├── MobileSettingsMenu.tsx     ← phone-only gear beside search: edit lock, show-hidden, per-column quiz hiding
+    ├── QueuePlayerBar.tsx         ← fixed bottom player: transport, mode, text on its own lines
+    ├── MultiSelectDropdown.tsx    ← language/tag filter dropdowns (Clear lives in a fixed footer)
+    ├── useClickOutside.ts         ← shared click-outside-to-close hook for the popovers
+    ├── icons.tsx                  ← shared inline SVG icons (gear, lock, eye, stop)
     ├── EditableText.tsx           ← inline-editable single-line text cell
     ├── TagsEditor.tsx             ← tag chip editor with click-to-add suggestion dropdown
     ├── PlayButton.tsx             ← small ▶/■ + label button
@@ -112,7 +118,7 @@ misleading — the real cause is StrictMode + the concurrency cap, not CORS
 config. This cost real debugging time once; don't reintroduce StrictMode.
 
 **Conditionally-mounted elements inside a `flex flex-wrap` row cause layout
-shift.** This bit us three separate times (StudyBar's "hide revealed cells
+shift.** This bit us three separate times (the "hide revealed cells
 again" button, Toolbar's "Clear N selected" button) — an element appearing/
 disappearing changes the row's total content width, which can push it past
 the wrap threshold and add a second line, growing that bar's height and
@@ -172,6 +178,24 @@ calls to the Lambda). **Prefer read-only verification (`listPhrases`,
 rendering, UI interaction that doesn't commit) wherever possible.** If a
 mutating test is unavoidable, capture the phrase's prior state first and
 revert it immediately after, the same way.
+
+**Rows and cards are memoized behind state signatures.** `PhraseTable`/`PhraseCards`
+skip re-rendering a row unless its phrase, playing state, or the signature string
+from `PhrasesPage` (`globalSignature` + `rowSignature`) changed. **Anything a cell
+closure reads must be reflected in one of those signatures**, or rows will show
+stale content until something else re-renders them. Handlers captured by rows must
+be stable or use functional state updates.
+
+**Sticky table header only works above 960px.** Below that the table wrapper is an
+`overflow-x-auto` scroll container (for `TABLE_MIN_WIDTH`), and a sticky `top` offset
+inside it shoves the header down over the rows. The header is therefore sticky only
+from 961px up (`min-[961px]:`), matching the wrapper's `max-[960px]:overflow-x-auto`.
+Keep those two breakpoints paired.
+
+**The header gear menu is portaled.** The table wrapper can clip absolutely
+positioned children, so `TableSettingsMenu` renders into `document.body` with fixed
+coordinates. The `actions` column hosts the gear and edit lock, so it is not
+hideable.
 
 ## Secrets / local dev
 

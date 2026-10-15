@@ -40,7 +40,7 @@ const PhraseCard = memo(
     // something other than the default (visible) state.
     const showVisibilityRow = editMode || (phrase.hide ?? false);
     return (
-      <div className={`rounded-lg border p-3 ${isPlaying ? 'border-blue-200 bg-blue-50' : 'border-slate-200'}`}>
+      <div className={`rounded-lg border p-3 ${isPlaying ? 'border-blue-200 bg-blue-50' : editMode ? 'border-amber-300' : 'border-slate-200'}`}>
         <div className="mb-1.5 flex items-center gap-2">
           {renderCell(row, 'select')}
           <div className="min-w-0 flex-1">{renderCell(row, 'languageName')}</div>

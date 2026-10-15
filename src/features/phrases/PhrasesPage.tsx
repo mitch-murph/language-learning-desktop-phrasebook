@@ -7,7 +7,6 @@ import { useQueuePlayer, type QueueMode } from './useQueuePlayer';
 import { buildColumns, type StudyColumn } from './columns';
 import PhraseTable from './PhraseTable';
 import Toolbar from './Toolbar';
-import StudyBar from './StudyBar';
 import ExportModal from './ExportModal';
 import QueuePlayerBar from './QueuePlayerBar';
 
@@ -192,20 +191,12 @@ export default function PhrasesPage() {
   if (loading) return <p className="text-sm text-slate-500">Loading phrases…</p>;
 
   return (
-    <div className={queue.length > 0 ? 'pb-16' : undefined}>
+    <div className={queue.length > 0 ? 'pb-44 sm:pb-36' : undefined}>
       {error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </div>
       )}
-      <StudyBar
-        editMode={editMode}
-        onToggleEditMode={() => setEditMode(v => !v)}
-        hidden={hidden}
-        onToggleHidden={toggleHidden}
-        onResetReveals={() => setRevealed(new Set())}
-        anyHidden={anyHidden}
-      />
       <Toolbar
         search={search}
         onSearchChange={setSearch}
@@ -217,8 +208,6 @@ export default function PhrasesPage() {
         tagOptions={tagFilterOptions}
         showHidden={showHidden}
         onShowHiddenChange={setShowHidden}
-        columnVisibility={columnVisibility}
-        onColumnVisibilityChange={setColumnVisibility}
         count={filtered.length}
         selectedCount={selected.size}
         onClearSelection={() => setSelected(new Set())}
@@ -228,6 +217,12 @@ export default function PhrasesPage() {
         shuffle={shuffleQueue}
         onShuffleChange={setShuffleQueue}
         onPlay={startQueue}
+        editMode={editMode}
+        onToggleEditMode={() => setEditMode(v => !v)}
+        studyHidden={hidden}
+        onToggleStudyHidden={toggleHidden}
+        onResetReveals={() => setRevealed(new Set())}
+        anyStudyHidden={anyHidden}
       />
       <PhraseTable
         data={filtered}
@@ -238,6 +233,11 @@ export default function PhrasesPage() {
         onColumnVisibilityChange={setColumnVisibility}
         globalSignature={globalSignature}
         rowSignature={rowSignature}
+        studyHidden={hidden}
+        onToggleStudyHidden={toggleHidden}
+        onToggleEditMode={() => setEditMode(v => !v)}
+        showHidden={showHidden}
+        onShowHiddenChange={setShowHidden}
       />
       {showExport && <ExportModal phrases={exportTargets} onClose={() => setShowExport(false)} />}
       {queue.length > 0 && (
