@@ -4,6 +4,7 @@ import { colorForName } from '../../domain/languages';
 import EditableText from './EditableText';
 import TagsEditor from './TagsEditor';
 import PlayButton from './PlayButton';
+import { RefreshIcon, TrashIcon } from './icons';
 
 const columnHelper = createColumnHelper<Phrase>();
 
@@ -61,6 +62,8 @@ interface ColumnOptions {
   onPlay: (phraseId: string, pace: 'normal' | 'slow', s3Key: string) => void;
   onPatch: (phraseId: string, fields: PhrasePatch) => void;
   onDelete: (phraseId: string) => void;
+  onRegenerate: (phrase: Phrase, text: string) => void;
+  regenerating: Set<string>;
   allTags: string[];
   editMode: boolean;
   hidden: Record<StudyColumn, boolean>;
@@ -90,6 +93,8 @@ export function buildColumns({
   onPlay,
   onPatch,
   onDelete,
+  onRegenerate,
+  regenerating,
   allTags,
   editMode,
   hidden,
@@ -160,7 +165,18 @@ export function buildColumns({
       header: 'Phrase',
       cell: info => {
         const row = info.row.original;
-        const content = (
+        // Text is immutable server-side, so committing a change regenerates the
+        // audio and saves a new record (see PhrasesPage.regenerate).
+        const content = editMode ? (
+          <EditableText
+            value={info.getValue()}
+            placeholder="phrase"
+            disabled={regenerating.has(row.phraseId)}
+            onCommit={v => {
+              if (v.trim()) onRegenerate(row, v.trim());
+            }}
+          />
+        ) : (
           <span className="block truncate text-sm font-medium text-slate-800" title={info.getValue()}>
             {info.getValue()}
           </span>
@@ -287,17 +303,36 @@ export function buildColumns({
       header: '',
       cell: info => {
         if (!editMode) return null;
+        const row = info.row.original;
+        const busy = regenerating.has(row.phraseId);
         return (
-          <button
-            type="button"
-            onMouseDown={e => e.preventDefault()}
-            onClick={() => {
-              if (window.confirm(`Delete "${info.row.original.text}"?`)) onDelete(info.row.original.phraseId);
-            }}
-            className="rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={busy}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => onRegenerate(row, row.text)}
+              title={busy ? 'Regenerating audio…' : 'Regenerate audio'}
+              aria-label="Regenerate audio"
+              className="rounded p-1.5 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+            >
+              <span className={busy ? 'inline-flex animate-spin' : 'inline-flex'}>
+                <RefreshIcon />
+              </span>
+            </button>
+            <button
+              type="button"
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => {
+                if (window.confirm(`Delete "${row.text}"?`)) onDelete(row.phraseId);
+              }}
+              title="Delete phrase"
+              aria-label="Delete phrase"
+              className="rounded p-1.5 text-red-600 hover:bg-red-50"
+            >
+              <TrashIcon />
+            </button>
+          </div>
         );
       },
     }),

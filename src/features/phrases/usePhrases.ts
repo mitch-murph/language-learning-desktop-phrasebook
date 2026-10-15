@@ -44,5 +44,22 @@ export function usePhrases() {
     }
   }, []);
 
-  return { phrases, loading, error, patch, remove };
+  const add = useCallback((phrase: Phrase) => {
+    setPhrases(list => [phrase, ...list]);
+  }, []);
+
+  // Swaps a regenerated phrase in for its predecessor. The new record is
+  // already saved, so a failed delete only leaves a visible duplicate.
+  const replace = useCallback(async (oldId: string, phrase: Phrase) => {
+    setPhrases(list => list.map(p => (p.phraseId === oldId ? phrase : p)));
+    try {
+      await deletePhrase(oldId);
+    } catch (e) {
+      setError(`Saved the new audio but could not remove the old entry: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, []);
+
+  const reportError = useCallback((message: string) => setError(message), []);
+
+  return { phrases, loading, error, patch, remove, add, replace, reportError };
 }

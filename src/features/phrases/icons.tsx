@@ -47,3 +47,20 @@ export function StopIcon({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
+
+export function RefreshIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg {...base} width={size} height={size}>
+      <path d="M16.5 10a6.5 6.5 0 1 1-2-4.7" strokeLinecap="round" />
+      <path d="M15 2.5v3h-3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function TrashIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg {...base} width={size} height={size}>
+      <path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5 5.5l.7 10a1.5 1.5 0 0 0 1.5 1.5h5.6a1.5 1.5 0 0 0 1.5-1.5l.7-10" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

@@ -42,6 +42,7 @@ src/
 ├── env.d.ts                    ← import.meta.env types
 ├── api/
 │   ├── client.ts                ← Phrase type, PhrasePatch type, listPhrases/updatePhrase/deletePhrase, getAudioUrl
+│   ├── tts.ts                    ← browser-side Google TTS proxy call, hard-coded prompts, proxy URL normalising (ported from tts-phrasebook)
 │   ├── crypto.ts                 ← HMAC-TOTP token generation (identical to tts-phrasebook)
 │   └── namespace.ts              ← #k= URL hash → private-library header (identical to tts-phrasebook)
 ├── domain/
@@ -60,6 +61,10 @@ src/
     ├── MultiSelectDropdown.tsx    ← language/tag filter dropdowns (Clear lives in a fixed footer)
     ├── useClickOutside.ts         ← shared click-outside-to-close hook for the popovers
     ├── icons.tsx                  ← shared inline SVG icons (gear, lock, eye, stop)
+    ├── QuickAddRow.tsx            ← inline add-phrase row, toggled by the toolbar's "+ Add phrase" (not by edit mode)
+    ├── generate.ts                ← generateAndSave(): TTS normal/slow/translation in the browser, then POST /phrases
+    ├── useTtsGate.tsx             ← runs TTS actions; on a token failure opens TtsTokenModal and retries with the pasted token
+    ├── TtsTokenModal.tsx          ← paste-a-new-proxy-URL dialog (plain "Continue", reopens with the error if it fails again)
     ├── EditableText.tsx           ← inline-editable single-line text cell
     ├── TagsEditor.tsx             ← tag chip editor with click-to-add suggestion dropdown
     ├── PlayButton.tsx             ← small ▶/■ + label button
@@ -96,6 +101,22 @@ edit or delete. `hidden: Record<StudyColumn, boolean>` + a per-cell `revealed`
 Set implement the quiz-style hide/reveal (click "Reveal" to peek one cell at a
 time; a "hide revealed cells again" button resets the Set without turning
 hiding off).
+
+**Audio is generated in the browser; the Lambda is storage-only.** Adding a phrase
+or regenerating one calls the Google TTS proxy directly (`api/tts.ts`), then
+`POST /phrases` with base64 MP3s. The proxy URL (with `token=`) lives in
+`localStorage` under `ttsUrl` and is pasted via `TtsTokenModal`. The proxy currently
+only checks that a token is *present*, not that it's valid; its 500 for a missing
+`url=` param is what looks like "bad token". `normalizeTtsUrl` fills `url=` in.
+Prompts, voice and model are hard-coded in `api/tts.ts` (no per-user overrides,
+unlike tts-phrasebook).
+
+**Text and audio are immutable server-side, so "regenerate" = save new + delete old.**
+Editing a phrase's text in edit mode, or the row's regenerate icon, saves a fresh
+record (new `phraseId` and `createdAt`, tags/translation/romanization/hide carried
+over) and then deletes the old one. Save-first means a failed delete leaves a
+duplicate rather than losing data. Same text overwrites the same S3 keys, so
+`refreshAudioCache` re-fetches them with `cache: 'reload'`.
 
 **No waveform scrubber.** One was built (Web Audio API decode → canvas-style
 bar rendering → click/drag to seek) and then deliberately removed at the

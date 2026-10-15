@@ -5,9 +5,10 @@ interface Props {
   placeholder?: string;
   onCommit: (value: string) => void;
   italic?: boolean;
+  disabled?: boolean;
 }
 
-export default function EditableText({ value, placeholder, onCommit, italic }: Props) {
+export default function EditableText({ value, placeholder, onCommit, italic, disabled }: Props) {
   const [draft, setDraft] = useState(value);
 
   useEffect(() => setDraft(value), [value]);
@@ -20,6 +21,7 @@ export default function EditableText({ value, placeholder, onCommit, italic }: P
     <input
       value={draft}
       placeholder={placeholder}
+      disabled={disabled}
       title={value || undefined}
       onChange={e => setDraft(e.target.value)}
       onBlur={commit}

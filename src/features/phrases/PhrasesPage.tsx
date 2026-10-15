@@ -9,6 +9,10 @@ import PhraseTable from './PhraseTable';
 import Toolbar from './Toolbar';
 import ExportModal from './ExportModal';
 import QueuePlayerBar from './QueuePlayerBar';
+import QuickAddRow from './QuickAddRow';
+import { generateAndSave, refreshAudioCache } from './generate';
+import { useTtsGate } from './useTtsGate';
+import { languagesFromPhrases } from '../../domain/languages';
 
 const NO_HIDDEN: Record<StudyColumn, boolean> = { text: false, transcription: false, translation: false };
 
@@ -33,7 +37,7 @@ function shuffled<T>(arr: T[]): T[] {
 }
 
 export default function PhrasesPage() {
-  const { phrases, loading, error, patch, remove } = usePhrases();
+  const { phrases, loading, error, patch, remove, add, replace, reportError } = usePhrases();
   const { playingKey, play, stop: stopRowAudio } = useAudioPlayer();
 
   const [search, setSearch] = useState('');
@@ -52,12 +56,57 @@ export default function PhrasesPage() {
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
   const [showExport, setShowExport] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
 
   const [playMode, setPlayMode] = useState<QueueMode>('recallDrill');
   const [shuffleQueue, setShuffleQueue] = useState(true);
   const [queue, setQueue] = useState<Phrase[]>([]);
   const queuePlayer = useQueuePlayer(queue, playMode);
+
+  const languageObjects = useMemo(() => languagesFromPhrases(phrases), [phrases]);
+
+  const gate = useTtsGate(e => reportError(e instanceof Error ? e.message : String(e)));
+
+  // Text and audio are immutable server-side, so "regenerate" (same text or an
+  // edited one) saves a fresh record and then deletes the old one. Rows are
+  // memoized, so this only touches functional setState and stable callbacks.
+  const regenerate = useCallback(
+    (p: Phrase, text: string) => {
+      setRegenerating(s => new Set(s).add(p.phraseId));
+      void gate
+        .run(async () => {
+          const fresh = await generateAndSave({
+            text,
+            languageCode: p.languageCode,
+            languageName: p.languageName,
+            nonLatin: p.nonLatin,
+            transcription: p.transcription,
+            translation: p.translation,
+            tags: p.tags,
+            hide: p.hide,
+          });
+          await refreshAudioCache(fresh);
+          setSelected(prev => {
+            if (!prev.has(p.phraseId)) return prev;
+            const n = new Set(prev);
+            n.delete(p.phraseId);
+            n.add(fresh.phraseId);
+            return n;
+          });
+          await replace(p.phraseId, fresh);
+        })
+        .finally(() =>
+          setRegenerating(s => {
+            const n = new Set(s);
+            n.delete(p.phraseId);
+            return n;
+          }),
+        );
+    },
+    [gate.run, replace],
+  );
 
   const languages = useMemo(
     () => [...new Set(phrases.map(p => p.languageName))].sort(),
@@ -160,6 +209,8 @@ export default function PhrasesPage() {
         onPlay: onCellPlay,
         onPatch: patch,
         onDelete: remove,
+        onRegenerate: regenerate,
+        regenerating,
         allTags: tags,
         editMode,
         hidden,
@@ -170,7 +221,7 @@ export default function PhrasesPage() {
         allVisibleSelected,
         onToggleSelectAllVisible: toggleSelectAllVisible,
       }),
-    [playingKey, patch, remove, tags, editMode, hidden, revealed, selected, allVisibleSelected, filtered],
+    [playingKey, patch, remove, regenerate, regenerating, tags, editMode, hidden, revealed, selected, allVisibleSelected, filtered],
   );
 
   // Signatures PhraseTable/PhraseCards use to decide which rows must re-render.
@@ -181,11 +232,11 @@ export default function PhrasesPage() {
   const rowSignature = useCallback(
     (id: string) => {
       const pace = playingKey === `${id}:normal` ? 'n' : playingKey === `${id}:slow` ? 's' : '-';
-      return `${selected.has(id) ? 1 : 0}${pace}${revealed.has(`${id}:text`) ? 1 : 0}${
+      return `${selected.has(id) ? 1 : 0}${regenerating.has(id) ? 1 : 0}${pace}${revealed.has(`${id}:text`) ? 1 : 0}${
         revealed.has(`${id}:transcription`) ? 1 : 0
       }${revealed.has(`${id}:translation`) ? 1 : 0}`;
     },
-    [selected, playingKey, revealed],
+    [selected, playingKey, revealed, regenerating],
   );
 
   if (loading) return <p className="text-sm text-slate-500">Loading phrases…</p>;
@@ -212,6 +263,8 @@ export default function PhrasesPage() {
         selectedCount={selected.size}
         onClearSelection={() => setSelected(new Set())}
         onExport={() => setShowExport(true)}
+        addOpen={showAdd}
+        onToggleAdd={() => setShowAdd(v => !v)}
         playMode={playMode}
         onPlayModeChange={setPlayMode}
         shuffle={shuffleQueue}
@@ -224,6 +277,14 @@ export default function PhrasesPage() {
         onResetReveals={() => setRevealed(new Set())}
         anyStudyHidden={anyHidden}
       />
+      <QuickAddRow
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        languages={languageObjects}
+        allTags={tags}
+        onAdded={add}
+      />
+      {gate.tokenModal}
       <PhraseTable
         data={filtered}
         columns={columns}

@@ -22,6 +22,8 @@ interface Props {
   selectedCount: number;
   onClearSelection: () => void;
   onExport: () => void;
+  addOpen: boolean;
+  onToggleAdd: () => void;
   playMode: QueueMode;
   onPlayModeChange: (m: QueueMode) => void;
   shuffle: boolean;
@@ -50,6 +52,8 @@ export default function Toolbar({
   selectedCount,
   onClearSelection,
   onExport,
+  addOpen,
+  onToggleAdd,
   playMode,
   onPlayModeChange,
   shuffle,
@@ -133,6 +137,18 @@ export default function Toolbar({
           className="min-w-0 flex-1 whitespace-nowrap rounded-md bg-slate-800 px-3 py-1.5 text-center text-sm font-medium tabular-nums text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-[170px] sm:flex-none"
         >
           Export{selectedCount > 0 ? ` ${selectedCount} selected` : ` all ${count}`}
+        </button>
+        <button
+          type="button"
+          onClick={onToggleAdd}
+          aria-pressed={addOpen}
+          className={`whitespace-nowrap rounded-md border px-3 py-1.5 text-sm font-medium ${
+            addOpen
+              ? 'border-blue-300 bg-blue-50 text-blue-700'
+              : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          + Add phrase
         </button>
         <button
           type="button"

@@ -71,3 +71,27 @@ export async function deletePhrase(phraseId: string): Promise<void> {
   });
   if (!res.ok) throw new Error(await readError(res));
 }
+
+export interface NewPhrase {
+  text: string;
+  languageCode: string;
+  languageName: string;
+  nonLatin: boolean;
+  normalAudioBase64: string;
+  slowAudioBase64: string;
+  transcription?: string;
+  translation?: string;
+  translationAudioBase64?: string;
+  tags?: string[];
+  hide?: boolean;
+}
+
+export async function savePhrase(args: NewPhrase): Promise<Phrase> {
+  const res = await fetch(`${LAMBDA_URL}/phrases`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
