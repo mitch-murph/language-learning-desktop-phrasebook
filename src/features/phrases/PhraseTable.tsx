@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { memo, useState, useSyncExternalStore } from 'react';
 import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type Row,
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
@@ -19,6 +20,11 @@ interface Props {
   editMode: boolean;
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: (v: VisibilityState) => void;
+  // Strings that change exactly when something a row's cells depend on
+  // changes, so unchanged rows can skip rendering. `globalSignature` covers
+  // state shared by all rows; `rowSignature` covers per-row state.
+  globalSignature: string;
+  rowSignature: (phraseId: string) => string;
 }
 
 // Relative column-width weights (not percentages) so hiding a column via the
@@ -44,6 +50,18 @@ const COLUMN_WEIGHTS: Record<ColumnId, number> = {
 };
 const TABLE_MIN_WIDTH = 900;
 
+// Matches Tailwind's `sm` breakpoint. Only one of table/cards is mounted at a
+// time (rather than both with CSS hiding one) so rows aren't rendered twice.
+const WIDE_QUERY = '(min-width: 640px)';
+function subscribeWide(cb: () => void) {
+  const m = window.matchMedia(WIDE_QUERY);
+  m.addEventListener('change', cb);
+  return () => m.removeEventListener('change', cb);
+}
+function getWide() {
+  return window.matchMedia(WIDE_QUERY).matches;
+}
+
 export default function PhraseTable({
   data,
   columns,
@@ -51,8 +69,12 @@ export default function PhraseTable({
   editMode,
   columnVisibility,
   onColumnVisibilityChange,
+  globalSignature,
+  rowSignature,
 }: Props) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const isWide = useSyncExternalStore(subscribeWide, getWide);
+  const globalSig = `${globalSignature}|${JSON.stringify(columnVisibility)}`;
 
   const table = useReactTable({
     data,
@@ -81,9 +103,9 @@ export default function PhraseTable({
     );
   }
 
-  return (
-    <>
-      <div className="hidden overflow-x-auto rounded-lg border border-slate-200 sm:block">
+  if (isWide) {
+    return (
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: TABLE_MIN_WIDTH }}>
           <colgroup>
             {visibleLeafColumns.map(col => {
@@ -122,34 +144,59 @@ export default function PhraseTable({
             ))}
           </thead>
           <tbody>
-            {rows.map(row => {
-              const isPlaying = row.original.phraseId === playingRowId;
-              return (
-                <tr
-                  key={row.id}
-                  className={`border-b border-slate-100 last:border-0 ${
-                    isPlaying ? 'bg-blue-50 hover:bg-blue-50' : 'hover:bg-slate-50/60'
-                  }`}
-                >
-                  {row.getVisibleCells().map(cell => (
-                    <td
-                      key={cell.id}
-                      className={`h-12 px-3 py-1.5 align-middle ${
-                        cell.column.id === 'tags' ? '' : 'overflow-hidden'
-                      }`}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
+            {rows.map(row => (
+              <PhraseRow
+                key={row.id}
+                row={row}
+                isPlaying={row.original.phraseId === playingRowId}
+                sig={`${globalSig}#${rowSignature(row.original.phraseId)}`}
+              />
+            ))}
           </tbody>
         </table>
       </div>
-      <div className="sm:hidden">
-        <PhraseCards rows={rows} playingRowId={playingRowId} editMode={editMode} />
-      </div>
-    </>
+    );
+  }
+
+  return (
+    <PhraseCards
+      rows={rows}
+      playingRowId={playingRowId}
+      editMode={editMode}
+      globalSig={globalSig}
+      rowSignature={rowSignature}
+    />
   );
 }
+
+interface PhraseRowProps {
+  row: Row<Phrase>;
+  isPlaying: boolean;
+  sig: string;
+}
+
+// Skips re-rendering unless this row's own phrase, playing state, or the
+// signature of the state its cells close over (selection, reveal, playing
+// pace, edit/study mode, column visibility, tag list) changed. Without this,
+// every checkbox toggle or playback tick re-rendered every cell in the table.
+const PhraseRow = memo(
+  function PhraseRow({ row, isPlaying }: PhraseRowProps) {
+    return (
+      <tr
+        className={`border-b border-slate-100 last:border-0 ${
+          isPlaying ? 'bg-blue-50 hover:bg-blue-50' : 'hover:bg-slate-50/60'
+        }`}
+      >
+        {row.getVisibleCells().map(cell => (
+          <td
+            key={cell.id}
+            className={`h-12 px-3 py-1.5 align-middle ${cell.column.id === 'tags' ? '' : 'overflow-hidden'}`}
+          >
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </td>
+        ))}
+      </tr>
+    );
+  },
+  (a, b) => a.row.original === b.row.original && a.isPlaying === b.isPlaying && a.sig === b.sig,
+);

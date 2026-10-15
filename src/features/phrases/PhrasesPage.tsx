@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import type { VisibilityState } from '@tanstack/react-table';
 import { getAudioUrl, type Phrase } from '../../api/client';
 import { usePhrases } from './usePhrases';
@@ -81,8 +81,12 @@ export default function PhrasesPage() {
     return [...new Set([...inScope, ...selectedTags])].sort();
   }, [phrases, tags, selectedLanguages, selectedTags]);
 
+  // Keystrokes update the input immediately; the (expensive) refilter and table
+  // re-render run at lower priority so typing stays responsive.
+  const deferredSearch = useDeferredValue(search);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     return phrases.filter(p => {
       if (!showHidden && (p.hide ?? false)) return false;
       if (selectedLanguages.length > 0 && !selectedLanguages.includes(p.languageName)) return false;
@@ -93,7 +97,7 @@ export default function PhrasesPage() {
       }
       return true;
     });
-  }, [phrases, search, selectedLanguages, selectedTags, showHidden]);
+  }, [phrases, deferredSearch, selectedLanguages, selectedTags, showHidden]);
 
   function toggleHidden(col: StudyColumn) {
     setHidden(h => ({ ...h, [col]: !h[col] }));
@@ -136,8 +140,10 @@ export default function PhrasesPage() {
 
   // A row's own Normal/Slow button and the background queue share one audio
   // stream conceptually — starting either one stops the other.
+  // Functional setQueue (not a `queue.length` read) because memoized rows may
+  // hold a stale copy of this callback.
   function onCellPlay(phraseId: string, pace: 'normal' | 'slow', s3Key: string) {
-    if (queue.length > 0) setQueue([]);
+    setQueue(q => (q.length > 0 ? [] : q));
     play(`${phraseId}:${pace}`, getAudioUrl(s3Key));
   }
 
@@ -166,6 +172,21 @@ export default function PhrasesPage() {
         onToggleSelectAllVisible: toggleSelectAllVisible,
       }),
     [playingKey, patch, remove, tags, editMode, hidden, revealed, selected, allVisibleSelected, filtered],
+  );
+
+  // Signatures PhraseTable/PhraseCards use to decide which rows must re-render.
+  // Anything the column cell closures read must be reflected in one of these.
+  const globalSignature = `${editMode ? 1 : 0}|${hidden.text ? 1 : 0}${hidden.transcription ? 1 : 0}${
+    hidden.translation ? 1 : 0
+  }|${tags.join('\u0001')}`;
+  const rowSignature = useCallback(
+    (id: string) => {
+      const pace = playingKey === `${id}:normal` ? 'n' : playingKey === `${id}:slow` ? 's' : '-';
+      return `${selected.has(id) ? 1 : 0}${pace}${revealed.has(`${id}:text`) ? 1 : 0}${
+        revealed.has(`${id}:transcription`) ? 1 : 0
+      }${revealed.has(`${id}:translation`) ? 1 : 0}`;
+    },
+    [selected, playingKey, revealed],
   );
 
   if (loading) return <p className="text-sm text-slate-500">Loading phrases…</p>;
@@ -215,6 +236,8 @@ export default function PhrasesPage() {
         editMode={editMode}
         columnVisibility={columnVisibility}
         onColumnVisibilityChange={setColumnVisibility}
+        globalSignature={globalSignature}
+        rowSignature={rowSignature}
       />
       {showExport && <ExportModal phrases={exportTargets} onClose={() => setShowExport(false)} />}
       {queue.length > 0 && (
