@@ -55,8 +55,8 @@ export default function PhrasesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showExport, setShowExport] = useState(false);
 
-  const [playMode, setPlayMode] = useState<QueueMode>('normal');
-  const [shuffleQueue, setShuffleQueue] = useState(false);
+  const [playMode, setPlayMode] = useState<QueueMode>('recallDrill');
+  const [shuffleQueue, setShuffleQueue] = useState(true);
   const [queue, setQueue] = useState<Phrase[]>([]);
   const queuePlayer = useQueuePlayer(queue, playMode);
 
@@ -68,6 +68,18 @@ export default function PhrasesPage() {
     () => [...new Set(phrases.flatMap(p => p.tags ?? []))].sort(),
     [phrases],
   );
+
+  // Toolbar tag filter only offers tags that exist in the selected languages
+  // (all tags when none selected). Already-selected tags stay listed so they
+  // remain visible/clearable after switching languages. The editor's
+  // suggestions keep using the global `tags` list.
+  const tagFilterOptions = useMemo(() => {
+    if (selectedLanguages.length === 0) return tags;
+    const inScope = phrases
+      .filter(p => selectedLanguages.includes(p.languageName))
+      .flatMap(p => p.tags ?? []);
+    return [...new Set([...inScope, ...selectedTags])].sort();
+  }, [phrases, tags, selectedLanguages, selectedTags]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -181,7 +193,7 @@ export default function PhrasesPage() {
         languageOptions={languages}
         selectedTags={selectedTags}
         onTagsChange={setSelectedTags}
-        tagOptions={tags}
+        tagOptions={tagFilterOptions}
         showHidden={showHidden}
         onShowHiddenChange={setShowHidden}
         columnVisibility={columnVisibility}

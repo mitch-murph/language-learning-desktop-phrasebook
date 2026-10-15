@@ -185,9 +185,20 @@ export function buildColumns({
         return studyCell('transcription', row.phraseId, hidden, isRevealed, onReveal, content);
       },
     }),
-    columnHelper.accessor('tags', {
+    // Untagged phrases map to undefined so `sortUndefined: 'last'` keeps them at
+    // the bottom in both directions. Sorting compares the alphabetized tag list.
+    columnHelper.accessor(row => (row.tags?.length ? row.tags : undefined), {
+      id: 'tags',
       header: 'Tags',
-      enableSorting: false,
+      sortUndefined: 'last',
+      sortingFn: (a, b, columnId) => {
+        const key = (r: typeof a) =>
+          [...((r.getValue(columnId) as string[] | undefined) ?? [])]
+            .map(t => t.toLowerCase())
+            .sort()
+            .join(',');
+        return key(a).localeCompare(key(b));
+      },
       cell: info => {
         const row = info.row.original;
         const tags = info.getValue() ?? [];
