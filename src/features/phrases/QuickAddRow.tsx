@@ -47,6 +47,7 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
   const [canFallback, setCanFallback] = useState(false);
   const [justAdded, setJustAdded] = useState('');
   const phraseRef = useRef<HTMLInputElement>(null);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     if (open) phraseRef.current?.focus();
@@ -69,7 +70,9 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
 
   async function submit(ttsCode?: string) {
     const trimmed = text.trim();
-    if (!trimmed || !lang || busy) return;
+    // Ref, not `busy` state: a second click/Enter can land before the re-render.
+    if (!trimmed || !lang || busy || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError('');
     setCanFallback(false);
@@ -100,6 +103,7 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
       onAdded(phrase);
       phraseRef.current?.focus();
     });
+    inFlight.current = false;
     setBusy(false);
   }
 
