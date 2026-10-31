@@ -64,3 +64,12 @@ export function TrashIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+export function KeyIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg {...base} width={size} height={size}>
+      <circle cx="6.5" cy="13.5" r="3.5" />
+      <path d="M9 11l7-7M13.5 6.5l2 2M11.5 8.5l1.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

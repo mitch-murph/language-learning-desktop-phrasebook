@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Phrase } from '../../api/client';
-import { TtsError } from '../../api/tts';
+import { callTts, TRANSLATION_PROMPT, TtsError } from '../../api/tts';
 import type { Language } from '../../domain/languages';
+import { KeyIcon } from './icons';
 import { generateAndSave } from './generate';
 import { useTtsGate } from './useTtsGate';
 
 const NEW = '__new__';
 const LANG_KEY = 'phrasebook.quickAddLanguage';
 const FALLBACK_CODE = 'en-US';
+
+type ClipKind = 'normal' | 'slow' | 'translation';
 
 interface Props {
   open: boolean;
@@ -48,6 +51,12 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
   const [justAdded, setJustAdded] = useState('');
   const phraseRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef(false);
+  const [listening, setListening] = useState<ClipKind | null>(null);
+  const [listenLoading, setListenLoading] = useState<ClipKind | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Clips synthesized by Listen, keyed by kind + text + voice; Add reuses matches.
+  const clips = useRef(new Map<string, string>());
+  const lastAction = useRef<{ kind: 'add' } | { kind: 'listen'; clip: ClipKind }>({ kind: 'add' });
 
   useEffect(() => {
     if (open) phraseRef.current?.focus();
@@ -68,15 +77,76 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
     setCanFallback(e instanceof TtsError && e.unsupportedLanguage);
   });
 
+  function stopListening() {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setListening(null);
+  }
+
+  useEffect(() => stopListening, []);
+
+  /** What to synthesize for a clip kind; null when there is nothing to say. */
+  function clipSpec(kind: ClipKind, voiceCode: string) {
+    const trimmed = text.trim();
+    const tr = translation.trim();
+    if (!lang) return null;
+    if (kind === 'translation') {
+      return tr ? { key: `translation|${tr}`, say: () => callTts(tr, 'en-US', 'normal', '', TRANSLATION_PROMPT) } : null;
+    }
+    return trimmed
+      ? { key: `${kind}|${voiceCode}|${lang.name}|${trimmed}`, say: () => callTts(trimmed, voiceCode, kind, lang.name) }
+      : null;
+  }
+
+  async function listen(kind: ClipKind, ttsCode?: string) {
+    const spec = clipSpec(kind, ttsCode ?? lang?.code ?? '');
+    if (!spec || busy || inFlight.current) return;
+    const wasPlaying = listening === kind;
+    stopListening();
+    if (wasPlaying) return;
+    inFlight.current = true;
+    setBusy(true);
+    setListenLoading(kind);
+    setError('');
+    setCanFallback(false);
+    setJustAdded('');
+    lastAction.current = { kind: 'listen', clip: kind };
+    await gate.run(async () => {
+      let base64 = clips.current.get(spec.key);
+      if (!base64) {
+        base64 = await spec.say();
+        clips.current.set(spec.key, base64);
+      }
+      const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+      audio.onended = () => {
+        if (audioRef.current === audio) stopListening();
+      };
+      audioRef.current = audio;
+      setListening(kind);
+      await audio.play();
+    });
+    inFlight.current = false;
+    setListenLoading(null);
+    setBusy(false);
+  }
+
   async function submit(ttsCode?: string) {
     const trimmed = text.trim();
     // Ref, not `busy` state: a second click/Enter can land before the re-render.
     if (!trimmed || !lang || busy || inFlight.current) return;
+    stopListening();
     inFlight.current = true;
     setBusy(true);
     setError('');
     setCanFallback(false);
     setJustAdded('');
+    lastAction.current = { kind: 'add' };
+    const code = ttsCode ?? lang.code;
+    const prefetched = {
+      normal: clips.current.get(clipSpec('normal', code)?.key ?? ''),
+      slow: clips.current.get(clipSpec('slow', code)?.key ?? ''),
+      translation: clips.current.get(clipSpec('translation', code)?.key ?? ''),
+    };
     await gate.run(async () => {
       const phrase = await generateAndSave(
         {
@@ -89,7 +159,9 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
           tags: tagsText.split(',').map(t => t.trim()).filter(Boolean),
         },
         ttsCode,
+        prefetched,
       );
+      clips.current.clear();
       try {
         localStorage.setItem(LANG_KEY, lang.name);
       } catch {
@@ -107,6 +179,23 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
     setBusy(false);
   }
 
+  /** Small in-field play control; fixed width so state changes never shift the field. */
+  function listenButton(kind: ClipKind, label: string, title: string) {
+    const active = listening === kind;
+    return (
+      <button
+        type="button"
+        onClick={() => void listen(kind)}
+        disabled={(busy && !active) || !clipSpec(kind, lang?.code ?? '')}
+        title={title}
+        aria-label={title}
+        className={`h-6 min-w-[28px] rounded px-1.5 text-xs font-medium tabular-nums hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30 ${active ? 'bg-blue-100 text-blue-700' : 'text-slate-600'}`}
+      >
+        {active ? '■' : listenLoading === kind ? '…' : label}
+      </button>
+    );
+  }
+
   return (
     <>
       <form
@@ -114,7 +203,13 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
           e.preventDefault();
           void submit();
         }}
-        onKeyDown={e => e.key === 'Escape' && onClose()}
+        onKeyDown={e => {
+          if (e.key === 'Escape') onClose();
+          else if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            void listen('normal');
+          }
+        }}
         className={`mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 ${open ? '' : 'hidden'}`}
         aria-label="Add phrase"
       >
@@ -152,14 +247,32 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
               </label>
             </>
           )}
-          <input
-            ref={phraseRef}
-            value={text}
-            onChange={e => setText(e.target.value)}
-            placeholder="Phrase"
-            className={`${input} min-w-[180px] flex-[2]`}
-            aria-label="Phrase"
-          />
+          <div className="relative min-w-[170px] flex-[2]">
+            <input
+              value={translation}
+              onChange={e => setTranslation(e.target.value)}
+              placeholder="Translation"
+              className={`${input} w-full pr-9`}
+              aria-label="Translation"
+            />
+            <div className="absolute inset-y-0 right-1 flex items-center">
+              {listenButton('translation', '▶', 'Hear the translation without saving')}
+            </div>
+          </div>
+          <div className="relative min-w-[200px] flex-[2]">
+            <input
+              ref={phraseRef}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="Phrase"
+              className={`${input} w-full pr-[84px]`}
+              aria-label="Phrase"
+            />
+            <div className="absolute inset-y-0 right-1 flex items-center gap-0.5">
+              {listenButton('normal', '▶', 'Hear the phrase at normal speed without saving (Ctrl+Enter)')}
+              {listenButton('slow', 'slow', 'Hear the phrase slowly without saving')}
+            </div>
+          </div>
           <input
             value={transcription}
             onChange={e => setTranscription(e.target.value)}
@@ -169,18 +282,11 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
             aria-label="Romanization"
           />
           <input
-            value={translation}
-            onChange={e => setTranslation(e.target.value)}
-            placeholder="Translation"
-            className={`${input} min-w-[140px] flex-[2]`}
-            aria-label="Translation"
-          />
-          <input
             value={tagsText}
             onChange={e => setTagsText(e.target.value)}
             placeholder="Tags, comma separated"
             list="quick-add-tags"
-            className={`${input} min-w-[120px] flex-1`}
+            className={`${input} min-w-[110px] flex-1`}
             aria-label="Tags"
           />
           <datalist id="quick-add-tags">
@@ -190,17 +296,20 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
           </datalist>
           <button
             type="submit"
+            title="Generate audio and save the phrase"
             disabled={busy || !text.trim() || !lang}
-            className="min-w-[110px] whitespace-nowrap rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-w-[56px] whitespace-nowrap rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {busy ? 'Generating…' : 'Add phrase'}
+            {busy && lastAction.current.kind === 'add' ? '…' : 'Add'}
           </button>
           <button
             type="button"
             onClick={gate.openTokenModal}
-            className="whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-amber-100"
+            title="TTS token"
+            aria-label="TTS token"
+            className="rounded-md p-1.5 text-slate-500 hover:bg-amber-100"
           >
-            TTS token
+            <KeyIcon />
           </button>
         </div>
         {(error || justAdded) && (
@@ -209,7 +318,9 @@ export default function QuickAddRow({ open, onClose, languages, allTags, onAdded
             {canFallback && (
               <button
                 type="button"
-                onClick={() => void submit(FALLBACK_CODE)}
+                onClick={() => void (lastAction.current.kind === 'listen'
+                      ? listen(lastAction.current.clip, FALLBACK_CODE)
+                      : submit(FALLBACK_CODE))}
                 className="ml-2 rounded bg-white px-2 py-0.5 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-50"
               >
                 Retry using {FALLBACK_CODE}

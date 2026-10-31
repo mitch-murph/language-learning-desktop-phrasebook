@@ -17,12 +17,19 @@ export interface PhraseDraft {
  * the phrase. `ttsCode` overrides the voice language only (fallback retries);
  * the stored languageCode stays the draft's.
  */
-export async function generateAndSave(draft: PhraseDraft, ttsCode = draft.languageCode): Promise<Phrase> {
+export async function generateAndSave(
+  draft: PhraseDraft,
+  ttsCode = draft.languageCode,
+  /** Clips already synthesized for this exact text + voice (e.g. by Listen). */
+  prefetched: { normal?: string; slow?: string; translation?: string } = {},
+): Promise<Phrase> {
   const translation = draft.translation?.trim() || undefined;
   const [normalAudioBase64, slowAudioBase64, translationAudioBase64] = await Promise.all([
-    callTts(draft.text, ttsCode, 'normal', draft.languageName),
-    callTts(draft.text, ttsCode, 'slow', draft.languageName),
-    translation ? callTts(translation, 'en-US', 'normal', '', TRANSLATION_PROMPT) : Promise.resolve(undefined),
+    prefetched.normal ?? callTts(draft.text, ttsCode, 'normal', draft.languageName),
+    prefetched.slow ?? callTts(draft.text, ttsCode, 'slow', draft.languageName),
+    translation
+      ? (prefetched.translation ?? callTts(translation, 'en-US', 'normal', '', TRANSLATION_PROMPT))
+      : Promise.resolve(undefined),
   ]);
   return savePhrase({
     text: draft.text,
