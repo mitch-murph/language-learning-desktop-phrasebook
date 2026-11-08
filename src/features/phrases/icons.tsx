@@ -65,6 +65,15 @@ export function TrashIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+export function FocusIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg {...base} width={size} height={size}>
+      <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7M13 3h2.5A1.5 1.5 0 0 1 17 4.5V7M17 13v2.5a1.5 1.5 0 0 1-1.5 1.5H13M7 17H4.5A1.5 1.5 0 0 1 3 15.5V13" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="10" cy="10" r="2" />
+    </svg>
+  );
+}
+
 export function KeyIcon({ size = 16 }: { size?: number }) {
   return (
     <svg {...base} width={size} height={size}>

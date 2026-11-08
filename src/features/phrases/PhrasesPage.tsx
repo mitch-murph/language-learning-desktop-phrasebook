@@ -10,6 +10,7 @@ import Toolbar from './Toolbar';
 import ExportModal from './ExportModal';
 import QueuePlayerBar from './QueuePlayerBar';
 import QuickAddRow from './QuickAddRow';
+import FocusModal from './FocusModal';
 import { generateAndSave, refreshAudioCache } from './generate';
 import { useTtsGate } from './useTtsGate';
 import { languagesFromPhrases } from '../../domain/languages';
@@ -18,12 +19,15 @@ const NO_HIDDEN: Record<StudyColumn, boolean> = { text: false, transcription: fa
 
 const COLUMN_VISIBILITY_KEY = 'phrasebook.columnVisibility';
 
+// Used until the user changes column visibility (then their choice is stored).
+const DEFAULT_COLUMN_VISIBILITY: VisibilityState = { createdAt: false, hide: false };
+
 function loadColumnVisibility(): VisibilityState {
   try {
     const raw = localStorage.getItem(COLUMN_VISIBILITY_KEY);
-    return raw ? JSON.parse(raw) : {};
+    return raw ? JSON.parse(raw) : DEFAULT_COLUMN_VISIBILITY;
   } catch {
-    return {};
+    return DEFAULT_COLUMN_VISIBILITY;
   }
 }
 
@@ -59,6 +63,7 @@ export default function PhrasesPage() {
   const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
   const [showExport, setShowExport] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [focusPhrase, setFocusPhrase] = useState<Phrase | null>(null);
 
   const [playMode, setPlayMode] = useState<QueueMode>('recallDrill');
   const [shuffleQueue, setShuffleQueue] = useState(true);
@@ -210,6 +215,7 @@ export default function PhrasesPage() {
         onPatch: patch,
         onDelete: remove,
         onRegenerate: regenerate,
+        onFocusPhrase: setFocusPhrase,
         regenerating,
         allTags: tags,
         editMode,
@@ -300,6 +306,7 @@ export default function PhrasesPage() {
         showHidden={showHidden}
         onShowHiddenChange={setShowHidden}
       />
+      {focusPhrase && <FocusModal phrase={focusPhrase} onClose={() => setFocusPhrase(null)} />}
       {showExport && <ExportModal phrases={exportTargets} onClose={() => setShowExport(false)} />}
       {queue.length > 0 && (
         <QueuePlayerBar

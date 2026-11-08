@@ -67,7 +67,9 @@ src/
     ├── TtsTokenModal.tsx          ← paste-a-new-proxy-URL dialog (plain "Continue", reopens with the error if it fails again)
     ├── EditableText.tsx           ← inline-editable single-line text cell
     ├── TagsEditor.tsx             ← tag chip editor with click-to-add suggestion dropdown
-    ├── PlayButton.tsx             ← small ▶/■ + label button
+    ├── PlayButton.tsx             ← compact icon button: ▶ (normal) / ½ (slow), ■ while playing
+    ├── FocusModal.tsx             ← per-phrase practice: click parts to hear them, build-up rows (from end/start); TTS on demand, clips cached in memory only, nothing saved to the backend
+    ├── chunks.ts                  ← splitIntoChunks(): whitespace split, Intl.Segmenter fallback for unspaced scripts
     ├── ExportModal.tsx            ← mode picker (normal/slow/drill/recall) + zip download
     └── exportUtils.ts             ← audio fetch/render/encode/zip logic
 ```
@@ -183,14 +185,25 @@ would get clipped by an ancestor's `overflow: hidden`. If tags ever need
 that fixed-height treatment too, the dropdown must be re-architected (e.g.
 a portal) first.
 
-**Table columns use percentage widths, not fixed pixels.** Fixed pixel
-widths summed to more than the app shell's available content width at any
-viewport, forcing horizontal scroll even at max container width. Column
-widths in `PhraseTable.tsx`'s `COLUMN_WIDTHS` are percentages summing to
-100%, with `TABLE_MIN_WIDTH = 900` as a floor below which it scrolls
-horizontally instead of squeezing columns unreadably thin. If you add a
-column, its width must be a percentage and the others should shrink to
-keep the sum at 100%.
+**Table columns use relative weights, with a few fixed-px exceptions.** Fixed
+pixel widths for *every* column summed to more than the app shell's width and
+forced horizontal scroll. So `PhraseTable.tsx`'s `COLUMN_WEIGHTS` are relative
+weights that share the visible columns' width (hiding a column redistributes
+its share), with `TABLE_MIN_WIDTH = 900` as a floor below which it scrolls
+horizontally. The exception is `FIXED_COLUMN_PX` (select, audio, actions):
+columns whose content is a fixed-size set of icons get a px width so freed
+space doesn't turn into white space inside them; the weighted columns use
+`calc((100% - fixedTotal px) * share)`. If you add a column, give it a weight,
+or a fixed px if its content has a fixed size. Saved and Visibility are hidden
+by default (`DEFAULT_COLUMN_VISIBILITY`) until the user changes visibility.
+
+**Focus mode chunking is mechanical.** `chunks.ts` splits on whitespace, or
+`Intl.Segmenter` for unspaced scripts. Romanization labels under each part only
+appear when the stored `transcription` has exactly one space-separated token per
+chunk; otherwise the whole romanization is shown as one line. The fix for a
+non-aligning phrase is to edit the spacing of the phrase or romanization, not
+to add heuristics. Fragment audio is synthesised in the browser on demand and
+cached in memory only; nothing is written to the backend.
 
 **`scrollbar-gutter: stable` is set on `html` in `index.css`** so the
 vertical scrollbar appearing/disappearing (as filtered row count changes)

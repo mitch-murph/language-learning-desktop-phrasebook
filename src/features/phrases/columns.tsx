@@ -4,7 +4,7 @@ import { colorForName } from '../../domain/languages';
 import EditableText from './EditableText';
 import TagsEditor from './TagsEditor';
 import PlayButton from './PlayButton';
-import { RefreshIcon, TrashIcon } from './icons';
+import { FocusIcon, RefreshIcon, TrashIcon } from './icons';
 
 const columnHelper = createColumnHelper<Phrase>();
 
@@ -63,6 +63,7 @@ interface ColumnOptions {
   onPatch: (phraseId: string, fields: PhrasePatch) => void;
   onDelete: (phraseId: string) => void;
   onRegenerate: (phrase: Phrase, text: string) => void;
+  onFocusPhrase: (phrase: Phrase) => void;
   regenerating: Set<string>;
   allTags: string[];
   editMode: boolean;
@@ -94,6 +95,7 @@ export function buildColumns({
   onPatch,
   onDelete,
   onRegenerate,
+  onFocusPhrase,
   regenerating,
   allTags,
   editMode,
@@ -250,15 +252,26 @@ export function buildColumns({
         return (
           <div className="flex items-center gap-1">
             <PlayButton
-              label="Normal"
+              glyph="▶"
+              title="Play at normal speed"
               active={playingKey === `${row.phraseId}:normal`}
               onClick={() => onPlay(row.phraseId, 'normal', row.normalS3Key)}
             />
             <PlayButton
-              label="Slow"
+              glyph="½"
+              title="Play slowly"
               active={playingKey === `${row.phraseId}:slow`}
               onClick={() => onPlay(row.phraseId, 'slow', row.slowS3Key)}
             />
+            <button
+              type="button"
+              onClick={() => onFocusPhrase(row)}
+              title="Focus: practise this phrase part by part"
+              aria-label="Focus on phrase"
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800 max-sm:h-9 max-sm:w-9"
+            >
+              <FocusIcon />
+            </button>
           </div>
         );
       },
@@ -302,9 +315,9 @@ export function buildColumns({
       enableSorting: false,
       header: '',
       cell: info => {
-        if (!editMode) return null;
         const row = info.row.original;
         const busy = regenerating.has(row.phraseId);
+        if (!editMode) return null;
         return (
           <div className="flex items-center gap-1">
             <button

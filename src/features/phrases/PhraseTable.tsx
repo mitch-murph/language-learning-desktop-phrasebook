@@ -55,6 +55,14 @@ const COLUMN_WEIGHTS: Record<ColumnId, number> = {
   hide: 6,
   actions: 8,
 };
+// Columns whose content has a fixed size (checkbox, three icon buttons, action
+// icons) get a pixel width so they never absorb freed-up space as white space;
+// the weighted columns share whatever remains.
+const FIXED_COLUMN_PX: Partial<Record<ColumnId, number>> = {
+  select: 44,
+  audio: 124,
+  actions: 84,
+};
 const TABLE_MIN_WIDTH = 900;
 
 // Matches Tailwind's `sm` breakpoint. Only one of table/cards is mounted at a
@@ -102,8 +110,10 @@ export default function PhraseTable({
 
   const rows = table.getRowModel().rows;
   const visibleLeafColumns = table.getVisibleLeafColumns();
+  const fixedPx = (id: string) => FIXED_COLUMN_PX[id as ColumnId];
+  const fixedTotal = visibleLeafColumns.reduce((sum, col) => sum + (fixedPx(col.id) ?? 0), 0);
   const totalWeight = visibleLeafColumns.reduce(
-    (sum, col) => sum + (COLUMN_WEIGHTS[col.id as ColumnId] ?? 10),
+    (sum, col) => (fixedPx(col.id) ? sum : sum + (COLUMN_WEIGHTS[col.id as ColumnId] ?? 10)),
     0,
   );
 
@@ -126,8 +136,15 @@ export default function PhraseTable({
         <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: TABLE_MIN_WIDTH }}>
           <colgroup>
             {visibleLeafColumns.map(col => {
+              const px = fixedPx(col.id);
+              if (px) return <col key={col.id} style={{ width: px }} />;
               const weight = COLUMN_WEIGHTS[col.id as ColumnId] ?? 10;
-              return <col key={col.id} style={{ width: `${(weight / totalWeight) * 100}%` }} />;
+              return (
+                <col
+                  key={col.id}
+                  style={{ width: `calc((100% - ${fixedTotal}px) * ${weight / totalWeight})` }}
+                />
+              );
             })}
           </colgroup>
           <thead>
